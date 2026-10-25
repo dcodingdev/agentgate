@@ -1,0 +1,12 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/src",
+    "${workspaceFolder}/backend/src"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/src",
+    "${workspaceFolder}/backend/src"
+  ],
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.diagnosticMode": "workspace"
+}
