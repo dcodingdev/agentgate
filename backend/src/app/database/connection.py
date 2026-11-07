@@ -29,8 +29,9 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
             min_size=2,
             max_size=20,
             open=False,
+            timeout=2.0,
         )
-        await _pool.open()
+        await _pool.open(wait=True, timeout=2.0)
 
         # Initialize run metadata table
         async with _pool.connection() as conn:

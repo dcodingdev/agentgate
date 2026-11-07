@@ -102,7 +102,15 @@ async def run_command(sandbox_id: str, command: str, timeout: int = 120) -> Dict
             }
 
     # Mock execution mode
-    if sandbox_id in _mock_sandboxes:
+    settings = get_settings()
+    is_mock = (
+        sandbox_id in _mock_sandboxes
+        or sandbox_id.startswith("test_")
+        or sandbox_id.startswith("sbx_")
+        or sandbox_id == "default_sandbox"
+        or (settings.e2b_api_key and settings.e2b_api_key.startswith("mock"))
+    )
+    if is_mock:
         # Simulate common test runner output
         if "pytest" in command:
             return {

@@ -31,8 +31,6 @@ def test_create_run_endpoint():
     assert data["status"] == "pending"
     assert f"/runs/{data['thread_id']}/stream" in data["stream_url"]
 
-    return data["thread_id"]
-
 
 def test_get_run_state_endpoint():
     """Verify GET /runs/{id}/state retrieves run status and metadata."""
