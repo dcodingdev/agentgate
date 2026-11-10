@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+:root {
+  --bg-canvas: #faf9f5;
+  --bg-card: #ffffff;
+  --border-subtle: #e7e5de;
+  --forest-green: #18533e;
+  --forest-hover: #134433;
+}
+
+body {
+  background-color: #faf9f5;
+  color: #1a1918;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

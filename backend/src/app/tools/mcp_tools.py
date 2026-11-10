@@ -2,8 +2,9 @@
 
 import logging
 from typing import Any, Dict, List
+# pyrefly: ignore[missing-import]
 from langchain_core.tools import BaseTool, tool
-from app.tools.code_executor import apply_patch, read_logs, run_tests
+from app.tools.code_executor import _run_sync, apply_patch, read_logs, run_tests
 from app.tools.mcp_client import get_mcp_client
 from app.tools.repo_tools_server import compute_risk_score_fn
 
@@ -13,80 +14,33 @@ logger = logging.getLogger(__name__)
 @tool
 def search_web(query: str) -> str:
     """Search developer documentation and technical references via Tavily MCP."""
-    import asyncio
-
     client = get_mcp_client()
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            res = asyncio.run_coroutine_threadsafe(
-                client.call_tool("tavily", "search", {"query": query}), loop
-            ).result(timeout=15)
-        else:
-            res = asyncio.run(client.call_tool("tavily", "search", {"query": query}))
-    except RuntimeError:
-        res = asyncio.run(client.call_tool("tavily", "search", {"query": query}))
-
+    res = _run_sync(client.call_tool("tavily", "search", {"query": query}), timeout=15)
     return str(res.get("results", res))
 
 
 @tool
 def fetch_github_issue(repo: str, issue_number: int) -> Dict[str, Any]:
     """Fetch issue details and discussions via GitHub MCP."""
-    import asyncio
-
     client = get_mcp_client()
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return asyncio.run_coroutine_threadsafe(
-                client.call_tool("github", "get_issue", {"repo": repo, "issue_id": issue_number}),
-                loop,
-            ).result(timeout=15)
-        else:
-            return asyncio.run(
-                client.call_tool("github", "get_issue", {"repo": repo, "issue_id": issue_number})
-            )
-    except RuntimeError:
-        return asyncio.run(
-            client.call_tool("github", "get_issue", {"repo": repo, "issue_id": issue_number})
-        )
+    return _run_sync(
+        client.call_tool("github", "get_issue", {"repo": repo, "issue_id": issue_number}),
+        timeout=15,
+    )
 
 
 @tool
 def create_pull_request(repo: str, title: str, head_branch: str, body: str) -> str:
     """Create a pull request with the verified patch on GitHub."""
-    import asyncio
-
     client = get_mcp_client()
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            res = asyncio.run_coroutine_threadsafe(
-                client.call_tool(
-                    "github",
-                    "create_pull_request",
-                    {"repo": repo, "title": title, "head": head_branch, "body": body},
-                ),
-                loop,
-            ).result(timeout=15)
-        else:
-            res = asyncio.run(
-                client.call_tool(
-                    "github",
-                    "create_pull_request",
-                    {"repo": repo, "title": title, "head": head_branch, "body": body},
-                )
-            )
-    except RuntimeError:
-        res = asyncio.run(
-            client.call_tool(
-                "github",
-                "create_pull_request",
-                {"repo": repo, "title": title, "head": head_branch, "body": body},
-            )
-        )
-
+    res = _run_sync(
+        client.call_tool(
+            "github",
+            "create_pull_request",
+            {"repo": repo, "title": title, "head": head_branch, "body": body},
+        ),
+        timeout=15,
+    )
     return res.get("pr_url", f"https://github.com/{repo}/pull/mock-pr")
 
 

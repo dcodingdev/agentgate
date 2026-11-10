@@ -1,3 +1,31 @@
+export type ScreenId =
+  | 'setup'
+  | 'live-sandbox'
+  | 'every-stage'
+  | 'approval-gate'
+  | 'clarification'
+  | 'blocked'
+  | 'finished'
+
+export type StageStatus = 'Done' | 'Running' | 'Waiting' | 'Escalated'
+
+export type GraphNodeId =
+  | 'guardrail'
+  | 'supervisor'
+  | 'research'
+  | 'fix_test'
+  | 'verify'
+  | 'reviewer'
+  | 'hitl'
+  | 'pr_agent'
+
+export interface GraphNodeMeta {
+  id: GraphNodeId
+  title: string
+  role: string
+  description: string
+}
+
 export interface CreateRunRequest {
   issue_url: string
   repo: string
@@ -58,20 +86,17 @@ export interface StreamEventPayload {
   timestamp: string
 }
 
-export type GraphNodeId =
-  | 'guardrail'
-  | 'supervisor'
-  | 'research'
-  | 'fix_test'
-  | 'verify'
-  | 'reviewer'
-  | 'hitl'
-  | 'pr_agent'
-
-export interface GraphNodeMeta {
-  id: GraphNodeId
-  title: string
-  role: string
-  description: string
+export interface RepoOption {
+  name: string
+  status: 'test-allowed' | 'allowed' | 'not-allowed'
+  statusLabel: string
+  defaultIssueUrl?: string
+  defaultIssueTitle?: string
 }
 
+export interface ClarificationData {
+  question: string
+  options: string[]
+  selectedOption?: string
+  customNotes?: string
+}

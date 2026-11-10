@@ -97,6 +97,8 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
         return UserCheck
       case 'pr_agent':
         return GitPullRequest
+      default:
+        return Bot
     }
   }
 

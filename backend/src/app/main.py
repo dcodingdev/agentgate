@@ -3,7 +3,9 @@
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+# pyrefly: ignore[missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore[missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as runs_router
@@ -87,6 +89,7 @@ async def root() -> dict:
 
 
 if __name__ == "__main__":
+    # pyrefly: ignore[missing-import]
     import uvicorn
 
     settings = get_settings()

@@ -1,111 +1,155 @@
-import React, { useEffect, useState } from 'react'
-import { Activity, ExternalLink, PlusCircle, Server, ShieldCheck } from 'lucide-react'
-import { checkBackendHealth } from '../services/api'
+import React from 'react'
+import type { ScreenId } from '../types'
 
 interface HeaderProps {
-  onOpenCreate: () => void
-  activeThreadId?: string | null
+  currentScreen: ScreenId
+  onSelectScreen: (screen: ScreenId) => void
+  onNavigateHome: () => void
+  repo?: string
+  issueTitle?: string
+  issueNumber?: string | number
+  statusText?: string
+  elapsedSeconds?: number
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenCreate, activeThreadId }) => {
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
-  const [backendMeta, setBackendMeta] = useState<{ service?: string; version?: string }>({})
+const SCREENS: { id: ScreenId; label: string }[] = [
+  { id: 'setup', label: '1. Setup' },
+  { id: 'live-sandbox', label: '2. Live sandbox' },
+  { id: 'every-stage', label: '3. Every stage' },
+  { id: 'approval-gate', label: '4. Approval gate' },
+  { id: 'clarification', label: '5. Clarification' },
+  { id: 'blocked', label: '6. Blocked' },
+  { id: 'finished', label: '7. Finished' },
+]
 
-  useEffect(() => {
-    let isMounted = true
-    const check = async () => {
-      try {
-        const data = await checkBackendHealth()
-        if (isMounted) {
-          setBackendStatus('online')
-          setBackendMeta({ service: data.service, version: data.version })
-        }
-      } catch {
-        if (isMounted) {
-          setBackendStatus('offline')
-        }
-      }
+export const Header: React.FC<HeaderProps> = ({
+  currentScreen,
+  onSelectScreen,
+  onNavigateHome,
+  repo = 'priya/shop-api',
+  issueTitle = 'Login tokens never expire',
+  issueNumber = '60',
+  statusText,
+  elapsedSeconds = 72,
+}) => {
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60)
+    const rem = secs % 60
+    return `${mins}m ${rem < 10 ? '0' : ''}${rem}s`
+  }
+
+  const renderStatus = () => {
+    if (currentScreen === 'setup') {
+      return null
     }
-    check()
-    const interval = setInterval(check, 10000)
-    return () => {
-      isMounted = false
-      clearInterval(interval)
+
+    if (currentScreen === 'approval-gate') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fef5ea] text-[#8a5314] border border-[#fae3cd]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706] animate-pulse"></span>
+          Status: Escalated · Approval needed
+        </span>
+      )
     }
-  }, [])
+
+    if (currentScreen === 'clarification') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fef5ea] text-[#8a5314] border border-[#fae3cd]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706] animate-pulse"></span>
+          Status: Escalated · Clarification needed
+        </span>
+      )
+    }
+
+    if (currentScreen === 'blocked') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+          Status: Blocked · Safety rule
+        </span>
+      )
+    }
+
+    if (currentScreen === 'finished') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#e1f4ec] text-[#136340]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#136340]"></span>
+          Status: Done · Completed
+        </span>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#e1f4ec] text-[#136340]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#136340] animate-pulse"></span>
+        Running · {statusText || formatTime(elapsedSeconds)}
+      </span>
+    )
+  }
 
   return (
-    <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-md">
-      {/* Brand */}
+    <header className="border-b border-[#ece9e2] bg-[#faf9f5] px-6 py-3 flex items-center justify-between text-sm select-none">
+      {/* Left side matching Image 1 & Image 2 */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/25">
-          <ShieldCheck className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-lg leading-tight tracking-tight text-white">AgentGate</h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-              v0.1.0
+        <button
+          onClick={onNavigateHome}
+          className="font-bold text-base text-[#18533e] tracking-tight hover:opacity-90 transition min-h-[44px] flex items-center cursor-pointer"
+        >
+          DevPilot
+        </button>
+
+        {/* Safety Cue badge */}
+        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#f0f9f4] text-[#18533e] border border-[#cbe4d7]">
+          Test repo only
+        </span>
+
+        {/* Breadcrumb / Context */}
+        {currentScreen === 'setup' ? (
+          <span className="text-[#68655e] text-xs font-normal">New run</span>
+        ) : (
+          <div className="hidden sm:flex items-center gap-2 text-xs text-[#5a5750]">
+            <span className="text-slate-300">·</span>
+            <span className="font-medium text-[#22211f]">{repo}</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[#68655e] truncate max-w-sm">
+              Issue #{issueNumber} {issueTitle}
             </span>
-          </div>
-          <p className="text-xs text-slate-400">Autonomous SWE Agent &amp; HITL Safety Guardrails</p>
-        </div>
-      </div>
-
-      {/* Center status indicator */}
-      <div className="hidden md:flex items-center gap-3 bg-slate-950/60 border border-slate-800/80 rounded-lg px-3 py-1.5 text-xs">
-        <Server className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-slate-400">Backend API:</span>
-        <div className="flex items-center gap-1.5 font-medium">
-          {backendStatus === 'online' && (
-            <>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-emerald-400">Online ({backendMeta.service || 'agentgate-backend'})</span>
-            </>
-          )}
-          {backendStatus === 'checking' && (
-            <>
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-              <span className="text-amber-400">Connecting...</span>
-            </>
-          )}
-          {backendStatus === 'offline' && (
-            <>
-              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              <span className="text-rose-400">Offline (FastAPI :8000)</span>
-            </>
-          )}
-        </div>
-
-        {activeThreadId && (
-          <div className="flex items-center gap-1.5 pl-3 border-l border-slate-800 text-slate-300">
-            <Activity className="w-3 h-3 text-indigo-400" />
-            <span className="text-slate-400">Active Run:</span>
-            <span className="font-mono text-indigo-300 font-semibold">{activeThreadId}</span>
           </div>
         )}
       </div>
 
-      {/* Right Actions */}
+      {/* Right side: Canvas screen selector & status */}
       <div className="flex items-center gap-3">
-        <a
-          href="/docs"
-          target="_blank"
-          rel="noreferrer"
-          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-800/50 transition"
-        >
-          API Docs <ExternalLink className="w-3 h-3" />
-        </a>
+        {/* Integrated Canvas Switcher in single header */}
+        <div className="flex items-center gap-1.5 bg-[#f0ede6] px-2.5 py-1.5 rounded-xl border border-[#e2dfd7] text-xs">
+          <label htmlFor="canvas-screen-select" className="text-[#8c8980] text-[11px] font-medium hidden md:inline">
+            Canvas screen:
+          </label>
+          <select
+            id="canvas-screen-select"
+            value={currentScreen}
+            onChange={(e) => onSelectScreen(e.target.value as ScreenId)}
+            className="bg-transparent text-xs font-semibold text-[#18533e] cursor-pointer focus:outline-none"
+          >
+            {SCREENS.map((s) => (
+              <option key={s.id} value={s.id} className="bg-white text-[#1a1918]">
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <button
-          onClick={onOpenCreate}
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/40 transition active:scale-[0.98]"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>New SWE Run</span>
-        </button>
+        {renderStatus()}
+
+        {currentScreen !== 'setup' && (
+          <button
+            onClick={onNavigateHome}
+            className="min-h-[44px] px-3 rounded-lg text-xs font-medium text-[#52504a] hover:text-[#18533e] hover:bg-[#f0ede6] transition flex items-center cursor-pointer"
+          >
+            New run
+          </button>
+        )}
       </div>
     </header>
   )
 }
-

@@ -1,6 +1,8 @@
 """Tests for FastAPI endpoints: POST /runs, GET /runs/{id}/stream, POST /runs/{id}/resume, GET /runs/{id}/state."""
 
+# pyrefly: ignore[missing-import]
 import pytest
+# pyrefly: ignore[missing-import]
 from fastapi.testclient import TestClient
 from app.main import app
 
