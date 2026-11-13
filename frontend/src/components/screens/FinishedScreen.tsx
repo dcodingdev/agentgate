@@ -17,6 +17,27 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
 }) => {
   const [copied, setCopied] = useState(false)
 
+  // Clean URL to prevent duplicate https://github.com/ prefixes
+  const cleanPrUrl = (url?: string | null): string => {
+    if (!url) return '#'
+    let cleaned = url.trim()
+    while (
+      cleaned.startsWith('https://github.com/https://github.com/') ||
+      cleaned.startsWith('https://github.com/http://github.com/') ||
+      cleaned.startsWith('http://github.com/https://github.com/')
+    ) {
+      cleaned = cleaned.replace(/^https?:\/\/github\.com\//i, '')
+    }
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      cleaned = `https://github.com/${cleaned.replace(/^\/+/, '')}`
+    }
+    return cleaned
+  }
+
+  const finalUrl = cleanPrUrl(prUrl)
+  const matchedNumber = finalUrl.match(/pull\/(\d+)/)?.[1]
+  const displayPrNumber = matchedNumber || prNumber
+
   const prBody = `## Summary of Changes
 - Fixes #60: Session tokens now strictly invalidate after \`SESSION_MAX_AGE_SECONDS\` (default: 3600s).
 - Added token creation timestamp validation in \`verify_session_token()\`.
@@ -60,17 +81,17 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
                 <span className="text-xs text-[#52504a]">Branch: <code className="font-mono bg-white/80 px-1.5 py-0.5 rounded border border-[#cbe4d7]">agent/fix-session-expiration</code></span>
               </div>
               <h1 id="pr-success-heading" className="text-lg font-bold text-[#1a1918] mt-1.5">
-                Pull Request #{prNumber} Published
+                Pull Request #{displayPrNumber} Published
               </h1>
               <p className="text-xs text-[#52504a] mt-0.5">
-                Target: <span className="font-medium text-[#1a1918]">{repo}</span> &larr; merged from verified sandbox patch
+                Target: <span className="font-medium text-[#1a1918]">{repo.replace(/^https?:\/\/github\.com\//i, '')}</span> &larr; merged from verified sandbox patch
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <a
-              href={prUrl || '#'}
+              href={finalUrl}
               target="_blank"
               rel="noreferrer"
               className="min-h-[44px] px-5 bg-[#18533e] text-white rounded-xl text-xs font-semibold hover:bg-[#124231] transition flex items-center justify-center gap-2 shadow-xs"

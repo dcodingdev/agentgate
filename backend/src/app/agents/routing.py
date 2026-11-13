@@ -51,14 +51,27 @@ def route_after_reviewer(state: SWEState, risk_threshold: Optional[float] = None
     threshold = risk_threshold if risk_threshold is not None else settings.risk_threshold_high
 
     risk_score = state.get("risk_score", 0.0)
-    hitl_required = state.get("hitl_required", False)
+    hitl_required = state.get("hitl_required")
 
-    if risk_score >= threshold or hitl_required:
+    if risk_score >= threshold or hitl_required is True:
         logger.info(
-            "High risk change detected (score: %.2f >= %.2f). Routing to hitl.",
+            "Human approval required (score: %.2f >= %.2f, hitl_required: %s). Routing to hitl.",
+            risk_score,
+            threshold,
+            hitl_required,
+        )
+        return "hitl"
+
+    if hitl_required is False:
+        logger.info(
+            "Low risk change (score: %.2f < %.2f). Routing directly to pr_agent.",
             risk_score,
             threshold,
         )
+        return "pr_agent"
+
+    if not settings.auto_approve_low_risk:
+        logger.info("Auto-approve disabled for low risk changes. Routing to hitl.")
         return "hitl"
 
     logger.info(

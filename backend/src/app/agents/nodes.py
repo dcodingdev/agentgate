@@ -1,13 +1,14 @@
 """Graph node implementations: guardrail, supervisor, research, fix_test, verify, reviewer, hitl, pr_agent."""
 
 import logging
+import re
 from typing import Any, Dict
 from langchain_core.messages import AIMessage
 from app.agents.state import SWEState
 from app.config import get_settings
 from app.execution.e2b_sandbox import create_sandbox
 from app.tools.code_executor import apply_patch, run_tests
-from app.tools.mcp_tools import create_pull_request
+from app.tools.mcp_tools import create_pull_request, fetch_github_issue
 from app.tools.repo_tools_server import compute_risk_score_fn
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,22 @@ async def research_node(state: SWEState) -> Dict[str, Any]:
     logger.info("Executing research_node for issue: %s", state.get("issue_url"))
     issue_desc = state.get("issue_description", "")
     repo = state.get("repo", "")
-
-    # In production, LLM inspects repo code via tools
     findings = f"Identified bug origin in {repo}. Issue context: {issue_desc[:120]}..."
+
+    # Fetch real GitHub issue details if available
+    match = re.search(r"issues/(\d+)", state.get("issue_url", ""))
+    if match and repo:
+        try:
+            issue_id = int(match.group(1))
+            issue_data = fetch_github_issue.invoke({"repo": repo, "issue_number": issue_id})
+            if issue_data and isinstance(issue_data, dict) and issue_data.get("title"):
+                findings = (
+                    f"Analyzed real GitHub issue #{issue_id}: '{issue_data['title']}' in {repo}. "
+                    f"Context: {issue_data.get('body', '')[:180]}..."
+                )
+        except Exception as err:
+            logger.warning("Could not fetch real issue data (%s), continuing with default.", err)
+
     files_changed = ["src/core/session.py", "tests/test_session.py"]
 
     return {
@@ -138,7 +152,7 @@ async def reviewer_node(state: SWEState) -> Dict[str, Any]:
 
     risk_score = risk_eval["risk_score"]
     is_high_risk = risk_score >= settings.risk_threshold_high
-    hitl_required = is_high_risk and not settings.auto_approve_low_risk
+    hitl_required = is_high_risk or (not settings.auto_approve_low_risk)
 
     return {
         "risk_score": risk_score,

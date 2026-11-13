@@ -1,6 +1,8 @@
 """Tests for agent routing, risk calculation logic, and graph assembly."""
 
+# pyrefly: ignore[missing-import]
 import pytest
+# pyrefly: ignore[missing-import]
 from langgraph.graph import END
 from app.agents.routing import (
     route_after_guardrail,
@@ -10,6 +12,7 @@ from app.agents.routing import (
 )
 from app.tools.repo_tools_server import compute_risk_score_fn
 from app.agents.graph import build_graph
+# pyrefly: ignore[missing-import]
 from langgraph.checkpoint.memory import MemorySaver
 
 

@@ -52,6 +52,15 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStartRun, loading = 
     }
   }
 
+  const handleIssueUrlChange = (url: string) => {
+    setIssueUrl(url)
+    const match = url.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)/)
+    if (match && match[1]) {
+      const extractedRepo = match[1]
+      setSelectedRepo(extractedRepo)
+    }
+  }
+
   const handleSelectRepo = (repo: RepoOption) => {
     if (repo.status === 'not-allowed') return
     setSelectedRepo(repo.name)
@@ -60,19 +69,54 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStartRun, loading = 
     }
   }
 
+  const sanitizeRepo = (raw: string): string => {
+    return raw
+      .trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^github\.com\//i, '')
+      .replace(/\/+$/, '')
+  }
+
   const handleStart = () => {
-    const activeRepo = REPO_OPTIONS.find((r) => r.name === selectedRepo)
+    const clean = sanitizeRepo(selectedRepo)
+    const activeRepo = REPO_OPTIONS.find((r) => r.name === clean)
     onStartRun({
-      repo: selectedRepo,
+      repo: clean,
       issue_url: issueUrl,
-      issue_title: activeRepo?.defaultIssueTitle || 'Fix issue in repository',
+      issue_title: activeRepo?.defaultIssueTitle || `Resolve issue in ${clean}`,
       issue_description: 'Autonomous resolution of reported bug and test verification.',
     })
   }
 
-  const filteredRepos = REPO_OPTIONS.filter((r) =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const cleanSearch = sanitizeRepo(searchQuery)
+  const cleanSelected = sanitizeRepo(selectedRepo)
+
+  const customRepoOption: RepoOption | null =
+    cleanSearch.includes('/') &&
+    !REPO_OPTIONS.some((r) => r.name.toLowerCase() === cleanSearch.toLowerCase())
+      ? {
+          name: cleanSearch,
+          status: 'allowed',
+          statusLabel: 'Custom repo · allowed',
+          defaultIssueUrl: `https://github.com/${cleanSearch}/issues/1`,
+          defaultIssueTitle: `Resolve issue in ${cleanSearch}`,
+        }
+      : cleanSelected && !REPO_OPTIONS.some((r) => r.name === cleanSelected)
+      ? {
+          name: cleanSelected,
+          status: 'allowed',
+          statusLabel: 'Custom repo · allowed',
+          defaultIssueUrl: issueUrl,
+          defaultIssueTitle: `Resolve issue in ${cleanSelected}`,
+        }
+      : null
+
+  const filteredRepos = [
+    ...(customRepoOption ? [customRepoOption] : []),
+    ...REPO_OPTIONS.filter((r) =>
+      r.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+  ]
 
   const isFormValid = isTokenVerified && selectedRepo && issueUrl.trim().length > 0
 
@@ -282,7 +326,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStartRun, loading = 
           type="url"
           required
           value={issueUrl}
-          onChange={(e) => setIssueUrl(e.target.value)}
+          onChange={(e) => handleIssueUrlChange(e.target.value)}
           placeholder="https://github.com/org/repo/issues/60"
           className="w-full bg-white border border-[#e5e2db] rounded-lg px-3.5 py-2.5 text-xs text-[#201e1b] placeholder-[#9c978f] focus:outline-none focus:border-[#18533e] min-h-[44px]"
         />

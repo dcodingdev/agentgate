@@ -34,14 +34,21 @@ class AgentService:
         issue_description: str = "",
     ) -> str:
         """Initialize a new SWE agent run and start asynchronous graph execution."""
+        clean_repo = (
+            repo.strip()
+            .removeprefix("https://github.com/")
+            .removeprefix("http://github.com/")
+            .removeprefix("github.com/")
+            .strip("/")
+        )
         thread_id = f"run_{uuid.uuid4().hex[:12]}"
-        logger.info("Starting run %s for repo %s and issue %s", thread_id, repo, issue_url)
+        logger.info("Starting run %s for repo %s and issue %s", thread_id, clean_repo, issue_url)
 
         # 1. Record metadata in database
         metadata = RunMetadata(
             thread_id=thread_id,
             issue_url=issue_url,
-            repo=repo,
+            repo=clean_repo,
             status="pending",
         )
         await save_run_metadata(metadata)
@@ -50,7 +57,7 @@ class AgentService:
         initial_state: SWEState = {
             "thread_id": thread_id,
             "issue_url": issue_url,
-            "repo": repo,
+            "repo": clean_repo,
             "issue_title": issue_title or "Resolve GitHub Issue",
             "issue_description": issue_description or "Autonomous bug resolution request",
             "test_attempts": 0,
