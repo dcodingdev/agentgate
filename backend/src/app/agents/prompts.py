@@ -20,7 +20,7 @@ Your responsibility is orchestrating the issue resolution workflow:
 
 RESEARCH_PROMPT = """You are the Senior Research Agent.
 Your objective is to investigate the repository, examine the issue description, identify affected source files, and pinpoint the exact root cause of the bug or feature request.
-Utilize issue details, codebase inspection, and search tools to produce clear findings and concrete patch targets.
+Utilize issue details, codebase inspection, and error logs to produce clear findings and concrete patch targets.
 """
 
 FIX_TEST_PROMPT = """You are the Fix & Test SWE Agent.

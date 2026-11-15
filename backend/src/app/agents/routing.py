@@ -1,8 +1,9 @@
 """Pure Python conditional routing functions for StateGraph edge transitions."""
 
 import logging
-from typing import Optional
+from typing import List, Optional, Union
 from langgraph.graph import END
+from langgraph.types import Send
 from app.agents.state import SWEState
 from app.config import get_settings
 
@@ -19,8 +20,45 @@ def route_after_guardrail(state: SWEState) -> str:
     return END
 
 
+def route_after_supervisor(state: SWEState) -> Union[str, List[Send]]:
+    """Route based on supervisor strategic judgment (hybrid decision-making).
+
+    When research is required, fans out in parallel using LangGraph Send:
+    - issue_analysis: examines issue context, stack traces, and GitHub discussion
+    - code_search: searches codebase for candidate symbols and files
+    - docs_lookup: retrieves architecture guidelines and documentation
+    """
+    decision = state.get("supervisor_decision")
+    logger.info("Evaluating supervisor strategic decision: %s", decision)
+
+    if decision == "escalate_to_human":
+        logger.info("Supervisor decided early escalation to human. Routing to hitl.")
+        return "hitl"
+
+    if decision == "reviewer":
+        logger.info("Supervisor decided code is verified. Routing to reviewer.")
+        return "reviewer"
+
+    if decision == "fix_test":
+        logger.info("Supervisor decided to apply patch. Routing to fix_test.")
+        return "fix_test"
+
+    if decision == "research" or not state.get("research_findings"):
+        logger.info(
+            "Supervisor requested research. Dispatching parallel workers via Send "
+            "(issue_analysis, code_search, docs_lookup)."
+        )
+        return [
+            Send("issue_analysis", state),
+            Send("code_search", state),
+            Send("docs_lookup", state),
+        ]
+
+    return "fix_test"
+
+
 def route_after_verify(state: SWEState) -> str:
-    """Route after test verification: proceed to reviewer if passed, loop to fix_test if retries remain."""
+    """Route after test verification: code enforces retry cap, supervisor decides retries."""
     test_results = state.get("test_results") or {}
     status = test_results.get("status", "failed")
     attempts = state.get("test_attempts", 1)
@@ -30,19 +68,21 @@ def route_after_verify(state: SWEState) -> str:
         logger.info("Tests verified successfully. Routing to reviewer.")
         return "reviewer"
 
-    if attempts < max_attempts:
-        logger.info(
-            "Tests failed (attempt %d of %d). Routing back to fix_test.",
+    # HARD CODE ENFORCEMENT: Max retry cap exceeded -> immediate HITL escalation
+    if attempts >= max_attempts:
+        logger.warning(
+            "Tests failed after %d attempts (max %d). Hard code guard: Escalating to hitl.",
             attempts,
             max_attempts,
         )
-        return "fix_test"
+        return "hitl"
 
-    logger.warning(
-        "Tests failed after %d attempts. Escalating to human-in-the-loop (hitl).",
+    logger.info(
+        "Tests failed (attempt %d of %d). Routing to supervisor for adaptive decision.",
         attempts,
+        max_attempts,
     )
-    return "hitl"
+    return "supervisor"
 
 
 def route_after_reviewer(state: SWEState, risk_threshold: Optional[float] = None) -> str:
@@ -83,7 +123,7 @@ def route_after_reviewer(state: SWEState, risk_threshold: Optional[float] = None
 
 
 def route_after_hitl(state: SWEState) -> str:
-    """Route after human intervention: PR agent if approved, fix_test if feedback given, else abort."""
+    """Route after human intervention: PR agent if approved, supervisor if feedback given, else abort."""
     approved = state.get("hitl_approved")
     feedback = state.get("hitl_feedback")
 
@@ -92,8 +132,8 @@ def route_after_hitl(state: SWEState) -> str:
         return "pr_agent"
 
     if approved is False and feedback:
-        logger.info("HITL requested revisions with feedback: %s. Routing to fix_test.", feedback)
-        return "fix_test"
+        logger.info("HITL requested revisions with feedback: %s. Routing to supervisor.", feedback)
+        return "supervisor"
 
     if approved is False:
         logger.warning("HITL rejected change without revision request. Routing to END.")

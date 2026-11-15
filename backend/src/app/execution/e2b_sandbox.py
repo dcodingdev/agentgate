@@ -77,8 +77,8 @@ async def reconnect_sandbox(sandbox_id: str) -> Optional[Any]:
     return None
 
 
-async def run_command(sandbox_id: str, command: str, timeout: int = 120) -> Dict[str, Any]:
-    """Execute shell command inside the target sandbox."""
+def run_command_sync(sandbox_id: str, command: str, timeout: int = 120) -> Dict[str, Any]:
+    """Execute shell command inside the target sandbox synchronously."""
     logger.info("Executing in sandbox [%s]: %s", sandbox_id, command)
 
     if sandbox_id in _active_sandboxes:
@@ -135,6 +135,11 @@ async def run_command(sandbox_id: str, command: str, timeout: int = 120) -> Dict
             }
 
     raise E2BSandboxError(f"Sandbox {sandbox_id} not found or expired.")
+
+
+async def run_command(sandbox_id: str, command: str, timeout: int = 120) -> Dict[str, Any]:
+    """Execute shell command inside the target sandbox."""
+    return run_command_sync(sandbox_id, command, timeout=timeout)
 
 
 async def kill_sandbox(sandbox_id: str) -> bool:

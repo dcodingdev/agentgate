@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List
 # pyrefly: ignore[missing-import]
 from langchain_core.tools import BaseTool, tool
-from app.tools.code_executor import _run_sync, apply_patch, read_logs, run_tests
+from app.tools.code_executor import apply_patch, read_logs, run_tests, search_code, read_repo_file
 from app.tools.mcp_client import get_mcp_client
 from app.tools.repo_tools_server import compute_risk_score_fn
 
@@ -12,34 +12,20 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def search_web(query: str) -> str:
-    """Search developer documentation and technical references via Tavily MCP."""
-    client = get_mcp_client()
-    res = _run_sync(client.call_tool("tavily", "search", {"query": query}), timeout=15)
-    return str(res.get("results", res))
-
-
-@tool
 def fetch_github_issue(repo: str, issue_number: int) -> Dict[str, Any]:
     """Fetch issue details and discussions via GitHub MCP."""
     client = get_mcp_client()
-    return _run_sync(
-        client.call_tool("github", "get_issue", {"repo": repo, "issue_id": issue_number}),
-        timeout=15,
-    )
+    return client.call_tool_sync("github", "get_issue", {"repo": repo, "issue_id": issue_number})
 
 
 @tool
 def create_pull_request(repo: str, title: str, head_branch: str, body: str) -> str:
     """Create a pull request with the verified patch on GitHub."""
     client = get_mcp_client()
-    res = _run_sync(
-        client.call_tool(
-            "github",
-            "create_pull_request",
-            {"repo": repo, "title": title, "head": head_branch, "body": body},
-        ),
-        timeout=15,
+    res = client.call_tool_sync(
+        "github",
+        "create_pull_request",
+        {"repo": repo, "title": title, "head": head_branch, "body": body},
     )
     return res.get("pr_url", f"https://github.com/{repo}/pull/mock-pr")
 
@@ -51,7 +37,10 @@ def evaluate_patch_risk(files_changed: List[str], diff_lines: int) -> Dict[str, 
 
 
 # Per-node tool subsets
-RESEARCH_TOOLS: List[BaseTool] = [fetch_github_issue, search_web, read_logs]
+ISSUE_ANALYSIS_TOOLS: List[BaseTool] = [fetch_github_issue, read_logs]
+CODE_SEARCH_TOOLS: List[BaseTool] = [search_code, read_repo_file, read_logs]
+DOCS_LOOKUP_TOOLS: List[BaseTool] = [read_repo_file, read_logs]
+RESEARCH_TOOLS: List[BaseTool] = [fetch_github_issue, search_code, read_repo_file, read_logs]
 FIX_TEST_TOOLS: List[BaseTool] = [apply_patch, run_tests, read_logs]
 VERIFY_TOOLS: List[BaseTool] = [run_tests, read_logs]
 REVIEWER_TOOLS: List[BaseTool] = [evaluate_patch_risk]
@@ -61,6 +50,10 @@ PR_TOOLS: List[BaseTool] = [create_pull_request]
 def get_tools_for_node(node_name: str) -> List[BaseTool]:
     """Retrieve specific tool subsets available to a node."""
     mapping = {
+        "issue_analysis": ISSUE_ANALYSIS_TOOLS,
+        "code_search": CODE_SEARCH_TOOLS,
+        "docs_lookup": DOCS_LOOKUP_TOOLS,
+        "aggregate_research": [],
         "research": RESEARCH_TOOLS,
         "fix_test": FIX_TEST_TOOLS,
         "verify": VERIFY_TOOLS,

@@ -10,6 +10,10 @@ from app.agents.state import SWEState
 from app.agents.nodes import (
     guardrail_node,
     supervisor_node,
+    issue_analysis_node,
+    code_search_node,
+    docs_lookup_node,
+    aggregate_research_node,
     research_node,
     fix_test_node,
     verify_node,
@@ -19,6 +23,7 @@ from app.agents.nodes import (
 )
 from app.agents.routing import (
     route_after_guardrail,
+    route_after_supervisor,
     route_after_verify,
     route_after_reviewer,
     route_after_hitl,
@@ -36,6 +41,10 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver] = None) -> CompiledS
     # 1. Register agent nodes
     workflow.add_node("guardrail", guardrail_node)
     workflow.add_node("supervisor", supervisor_node)
+    workflow.add_node("issue_analysis", issue_analysis_node)
+    workflow.add_node("code_search", code_search_node)
+    workflow.add_node("docs_lookup", docs_lookup_node)
+    workflow.add_node("aggregate_research", aggregate_research_node)
     workflow.add_node("research", research_node)
     workflow.add_node("fix_test", fix_test_node)
     workflow.add_node("verify", verify_node)
@@ -46,7 +55,7 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver] = None) -> CompiledS
     # 2. Set Entry Point
     workflow.set_entry_point("guardrail")
 
-    # 3. Guardrail conditional routing
+    # 3. Guardrail conditional routing (code safety gate)
     workflow.add_conditional_edges(
         "guardrail",
         route_after_guardrail,
@@ -56,23 +65,44 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver] = None) -> CompiledS
         },
     )
 
-    # 4. Supervisor -> Research -> Fix/Test -> Verify
-    workflow.add_edge("supervisor", "research")
-    workflow.add_edge("research", "fix_test")
+    # 4. Supervisor conditional routing (parallel research via Send, fix_test, reviewer, hitl)
+    workflow.add_conditional_edges(
+        "supervisor",
+        route_after_supervisor,
+        [
+            "issue_analysis",
+            "code_search",
+            "docs_lookup",
+            "fix_test",
+            "reviewer",
+            "hitl",
+            "research",
+        ],
+    )
+
+    # 5. Parallel research fan-in to aggregator, then back to supervisor
+    workflow.add_edge("issue_analysis", "aggregate_research")
+    workflow.add_edge("code_search", "aggregate_research")
+    workflow.add_edge("docs_lookup", "aggregate_research")
+    workflow.add_edge("aggregate_research", "supervisor")
+    workflow.add_edge("research", "supervisor")
+
+    # 6. Fix/Test applies patch and advances to verify
     workflow.add_edge("fix_test", "verify")
 
-    # 5. Verification conditional routing (pass -> reviewer, fail -> retry fix_test or hitl)
+    # 7. Verification conditional routing:
+    # Passed -> reviewer; Failed under cap -> supervisor; Failed >= max cap -> hitl
     workflow.add_conditional_edges(
         "verify",
         route_after_verify,
         {
             "reviewer": "reviewer",
-            "fix_test": "fix_test",
+            "supervisor": "supervisor",
             "hitl": "hitl",
         },
     )
 
-    # 6. Reviewer conditional routing (low risk -> pr_agent, high risk -> hitl)
+    # 8. Reviewer conditional routing (low risk -> pr_agent, high risk -> hitl)
     workflow.add_conditional_edges(
         "reviewer",
         route_after_reviewer,
@@ -82,19 +112,19 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver] = None) -> CompiledS
         },
     )
 
-    # 7. HITL conditional routing (approve -> pr_agent, reject+feedback -> fix_test, reject -> END)
+    # 9. HITL conditional routing (approve -> pr_agent, feedback -> supervisor, reject -> END)
     workflow.add_conditional_edges(
         "hitl",
         route_after_hitl,
         {
             "pr_agent": "pr_agent",
-            "fix_test": "fix_test",
+            "supervisor": "supervisor",
             "hitl": "hitl",
             END: END,
         },
     )
 
-    # 8. PR Agent terminal edge
+    # 10. PR Agent terminal edge
     workflow.add_edge("pr_agent", END)
 
     # Compile with checkpointer and HITL interrupt
@@ -118,3 +148,18 @@ def get_graph() -> CompiledStateGraph:
     if _compiled_graph is None:
         _compiled_graph = build_graph()
     return _compiled_graph
+
+
+def export_graph_markdown(output_path: str = "STATEGRAPH.md") -> str:
+    """Render and save the compiled StateGraph's Mermaid diagram to a markdown file."""
+    graph = get_graph()
+    mermaid_syntax = graph.get_graph().draw_mermaid()
+    md_content = f"# AgentGate SWE StateGraph Architecture\n\n```mermaid\n{mermaid_syntax}\n```\n"
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(md_content)
+    logger.info("Saved LangGraph structure to %s", output_path)
+    return md_content
+
+
+if __name__ == "__main__":
+    export_graph_markdown()

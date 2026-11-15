@@ -23,7 +23,20 @@ _fallback_memory_store: dict[str, RunMetadata] = {}
 async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]:
     """Initialize Postgres connection pool and checkpointer with fallback."""
     global _pool, _checkpointer
+    import os
     settings = get_settings()
+
+    if (
+        not settings.database_url
+        or "mock" in settings.database_url.lower()
+        or "sqlite" in settings.database_url.lower()
+        or os.getenv("DATABASE_URL") == "mock"
+        or os.getenv("TESTING")
+    ):
+        logger.info("Using in-memory store and MemorySaver (mock database configured).")
+        _pool = None
+        _checkpointer = MemorySaver()
+        return _pool, _checkpointer
 
     try:
         logger.info("Connecting to PostgreSQL at %s", settings.database_url)

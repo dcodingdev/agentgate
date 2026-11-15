@@ -7,7 +7,7 @@ AgentGate is an enterprise-grade autonomous Software Engineering (SWE) agent bac
 - **Multi-Agent StateGraph**: Structured orchestration spanning Guardrail, Supervisor, Research, Fix & Test, Verification, Reviewer, HITL Approval, and PR Agent.
 - **Human-In-The-Loop (HITL)**: Risk-driven intervention powered by LangGraph checkpointers (`PostgresSaver`) allowing safe pause, review, and resume of runs.
 - **Isolated Execution**: Low-level E2B cloud sandbox runtime for safe patch application and test suite execution.
-- **MCP Integration**: Multi-server MCP client supporting GitHub, Filesystem, Tavily search, plus an internal FastMCP server for test parsing and risk scoring.
+- **MCP Integration**: Multi-server MCP client supporting GitHub and Filesystem, plus an internal FastMCP server for test parsing and risk scoring.
 - **Real-Time Streaming**: Server-Sent Events (SSE) streaming run state and agent actions in real time.
 - **Postgres Persistence**: Persists run metadata and LangGraph state checkpoints with `psycopg_pool` and `PostgresSaver`.
 
@@ -43,7 +43,7 @@ backend/
 │       │   └── prompts.py          # Prompt constants per agent node
 │       │
 │       ├── tools/
-│       │   ├── mcp_client.py       # MultiServerMCPClient setup (GitHub, Filesystem, Tavily)
+│       │   ├── mcp_client.py       # MultiServerMCPClient setup (GitHub, Filesystem)
 │       │   ├── mcp_tools.py        # tool lookup helpers, per-node tool subsets
 │       │   ├── code_executor.py    # agent-facing tools: apply_patch, run_tests, read_logs
 │       │   └── repo_tools_server.py # custom FastMCP (parse_test_output, compute_risk_score)
@@ -75,7 +75,7 @@ cp .env.example .env
 ```
 
 Key variables:
-- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`: LLM credentials
+- `GEMINI_API_KEY` / `GROK_API_KEY`: LLM credentials
 - `E2B_API_KEY`: Sandbox code execution
 - `GITHUB_TOKEN`: Pull request and repository access
 - `DATABASE_URL`: PostgreSQL connection string

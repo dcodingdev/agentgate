@@ -23,10 +23,10 @@ class Settings(BaseSettings):
     fastapi_port: int = Field(default=8000, alias="FASTAPI_PORT")
     debug: bool = Field(default=False, alias="DEBUG")
 
-    # LLM Providers
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    model_name: str = Field(default="gpt-4o", alias="MODEL_NAME")
+    # LLM Providers (Active Real Keys)
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    grok_api_key: str = Field(default="", alias="GROK_API_KEY")
+    model_name: str = Field(default="gemini-flash-3.8", alias="MODEL_NAME")
 
     # Database & Persistence
     database_url: str = Field(
@@ -44,7 +44,6 @@ class Settings(BaseSettings):
 
     # Tool Integrations
     github_token: str = Field(default="", alias="GITHUB_TOKEN")
-    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
 
     # Guardrails & Decision Thresholds
     allowed_repos: List[str] = Field(default_factory=lambda: ["*"], alias="ALLOWED_REPOS")

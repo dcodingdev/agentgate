@@ -23,8 +23,16 @@ class SWEState(TypedDict, total=False):
     guardrail_passed: bool
     guardrail_reason: Optional[str]
 
-    # Research phase
+    # Supervisor strategic decisions (Hybrid orchestration)
+    supervisor_decision: Optional[str]  # "research", "fix_test", "reviewer", "escalate_to_human"
+    supervisor_reasoning: Optional[str]
+    escalation_reason: Optional[str]
+
+    # Research phase (Parallel research via LangGraph Send)
     research_findings: Optional[str]
+    issue_analysis_result: Optional[str]
+    code_search_result: Optional[str]
+    docs_lookup_result: Optional[str]
 
     # Code generation and patch application
     patch_diff: Optional[str]

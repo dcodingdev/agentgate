@@ -1,5 +1,8 @@
 """Tests for FastAPI endpoints: POST /runs, GET /runs/{id}/stream, POST /runs/{id}/resume, GET /runs/{id}/state."""
 
+import os
+os.environ["DATABASE_URL"] = "mock"
+
 # pyrefly: ignore[missing-import]
 import pytest
 # pyrefly: ignore[missing-import]

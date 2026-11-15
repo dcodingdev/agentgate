@@ -23,14 +23,14 @@ const NODES_PIPELINE: GraphNodeMeta[] = [
   {
     id: 'supervisor',
     title: '2. Supervisor',
-    role: 'Execution Coordinator',
-    description: 'Provisions an isolated E2B code interpreter sandbox and manages multi-agent handoffs.',
+    role: 'Hybrid Orchestrator',
+    description: 'Evaluates state, decides retry pivots, escalates early, or dispatches parallel research via LangGraph Send.',
   },
   {
     id: 'research',
-    title: '3. Research',
-    role: 'Root Cause Analysis',
-    description: 'Analyzes GitHub issue reproduction details, queries codebase, and identifies target files.',
+    title: '3. Parallel Research',
+    role: 'Fan-Out: Issue, Code & Docs',
+    description: 'LangGraph Send spawns issue_analysis, code_search, and docs_lookup in parallel, joined by aggregate_research.',
   },
   {
     id: 'fix_test',
@@ -85,6 +85,10 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
         return ShieldCheck
       case 'supervisor':
         return Bot
+      case 'issue_analysis':
+      case 'code_search':
+      case 'docs_lookup':
+      case 'aggregate_research':
       case 'research':
         return Search
       case 'fix_test':
