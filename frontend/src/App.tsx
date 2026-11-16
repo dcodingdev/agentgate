@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import type {
   CreateRunRequest,
+  GraphNodeId,
   RunStateResponse,
   ScreenId,
   StreamEventPayload,
 } from './types'
 import { createRun, getRunState, resumeRun, subscribeToRunEvents } from './services/api'
 import { Header } from './components/Header'
+import { ExecutionGraph } from './components/ExecutionGraph'
 import { SetupScreen } from './components/screens/SetupScreen'
 import { LiveSandboxScreen } from './components/screens/LiveSandboxScreen'
 import { EveryStageScreen } from './components/screens/EveryStageScreen'
@@ -33,6 +35,8 @@ export default function App() {
   const [activeIssueNumber, setActiveIssueNumber] = useState<string | number>('60')
   const [sandboxId, setSandboxId] = useState<string>('sbx_8f21')
   const [currentAttempt, setCurrentAttempt] = useState<number>(2)
+  const [showWorkflowGraph, setShowWorkflowGraph] = useState<boolean>(false)
+  const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNodeId | null>(null)
 
   // Timer for running badge
   useEffect(() => {
@@ -229,8 +233,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf9f5] text-[#1a1918] flex flex-col font-sans selection:bg-[#18533e]/15 selection:text-[#18533e]">
-      {/* Single Top Header matching DevPilot specs */}
+    <div className="min-h-screen bg-[#fffdf8] text-[#18181b] flex flex-col font-sans selection:bg-[#fff4da] selection:text-[#d31611]">
+      {/* Top Header matching GitReverse Design System */}
       <Header
         currentScreen={currentScreen}
         onSelectScreen={(screen) => setCurrentScreen(screen)}
@@ -242,23 +246,82 @@ export default function App() {
         issueTitle={activeIssueTitle}
         issueNumber={activeIssueNumber}
         elapsedSeconds={elapsedSeconds}
+        showWorkflowGraph={showWorkflowGraph}
+        onToggleWorkflowGraph={() => setShowWorkflowGraph((prev) => !prev)}
       />
 
-      {/* 3. Error Banner */}
+      {/* LangGraph Multi-Agent Stepper (Toggled from Header) */}
+      {showWorkflowGraph && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
+          <ExecutionGraph
+            currentNode={
+              runState?.values?.current_node ||
+              (runState?.status === 'paused_hitl'
+                ? 'hitl'
+                : currentScreen === 'live-sandbox'
+                ? 'verify'
+                : currentScreen === 'approval-gate'
+                ? 'hitl'
+                : currentScreen === 'finished'
+                ? 'pr_agent'
+                : currentScreen === 'blocked'
+                ? 'guardrail'
+                : null)
+            }
+            completedNodes={
+              (runState?.values?.completed_nodes as string[]) ||
+              (currentScreen === 'live-sandbox'
+                ? ['guardrail', 'supervisor', 'research', 'fix_test']
+                : currentScreen === 'approval-gate'
+                ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer']
+                : currentScreen === 'finished'
+                ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer', 'hitl', 'pr_agent']
+                : currentScreen === 'clarification'
+                ? ['guardrail', 'supervisor']
+                : currentScreen === 'blocked'
+                ? []
+                : [])
+            }
+            status={
+              runState?.status ||
+              (currentScreen === 'approval-gate'
+                ? 'paused_hitl'
+                : currentScreen === 'finished'
+                ? 'completed'
+                : currentScreen === 'blocked'
+                ? 'rejected'
+                : currentScreen === 'clarification'
+                ? 'waiting'
+                : currentScreen === 'setup'
+                ? 'idle'
+                : 'running')
+            }
+            selectedNode={selectedGraphNode}
+            onSelectNode={setSelectedGraphNode}
+          />
+        </section>
+      )}
+
+      {/* 3. Error Banner with GitReverse Accent & Borders */}
       {errorMessage && (
         <aside
           role="alert"
           aria-label="System notification"
           className="max-w-3xl mx-auto mt-4 px-4 w-full"
         >
-          <div className="p-4 bg-[#fef5ea] border border-[#fae3cd] rounded-xl text-xs text-[#8a5314] flex items-start justify-between gap-3 shadow-xs">
-            <div>
-              <p className="font-semibold text-[#8a5314]">Canvas Preview Mode Active</p>
-              <p className="mt-1 leading-relaxed text-[#52504a]">{errorMessage}</p>
+          <div className="p-4 bg-[#fff4da] border-2 border-[#18181b] rounded-xl text-xs text-[#18181b] flex items-start justify-between gap-3 shadow-[2px_2px_0px_#18181b]">
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-md bg-[#d31611] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-[#18181b]">
+                !
+              </span>
+              <div>
+                <p className="font-bold text-[#18181b]">Canvas Preview Notice</p>
+                <p className="mt-1 leading-relaxed text-[#666666]">{errorMessage}</p>
+              </div>
             </div>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-[#8a5314] hover:text-[#52504a] font-bold px-2 py-1 rounded min-h-[36px]"
+              className="text-[#18181b] hover:text-[#d31611] font-bold px-2 py-1 rounded min-h-[36px] cursor-pointer"
               aria-label="Dismiss error notice"
             >
               ✕
@@ -268,7 +331,7 @@ export default function App() {
       )}
 
       {/* 4. Active Screen Rendered on Canvas */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-4">
         {currentScreen === 'setup' && (
           <SetupScreen onStartRun={handleStartRun} loading={loading} />
         )}

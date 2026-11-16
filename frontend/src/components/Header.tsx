@@ -10,6 +10,8 @@ interface HeaderProps {
   issueNumber?: string | number
   statusText?: string
   elapsedSeconds?: number
+  showWorkflowGraph?: boolean
+  onToggleWorkflowGraph?: () => void
 }
 
 const SCREENS: { id: ScreenId; label: string }[] = [
@@ -31,6 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
   issueNumber = '60',
   statusText,
   elapsedSeconds = 72,
+  showWorkflowGraph = false,
+  onToggleWorkflowGraph,
 }) => {
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60)
@@ -45,8 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
 
     if (currentScreen === 'approval-gate') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fef5ea] text-[#8a5314] border border-[#fae3cd]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706] animate-pulse"></span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#fff4da] text-[#18181b] border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b]">
+          <span className="w-2 h-2 rounded-full bg-[#d31611] animate-pulse"></span>
           Status: Escalated · Approval needed
         </span>
       )
@@ -54,8 +58,8 @@ export const Header: React.FC<HeaderProps> = ({
 
     if (currentScreen === 'clarification') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fef5ea] text-[#8a5314] border border-[#fae3cd]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706] animate-pulse"></span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#fff4da] text-[#18181b] border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b]">
+          <span className="w-2 h-2 rounded-full bg-[#d31611] animate-pulse"></span>
           Status: Escalated · Clarification needed
         </span>
       )
@@ -63,8 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
 
     if (currentScreen === 'blocked') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#fffdf8] text-[#d31611] border-2 border-[#d31611] shadow-[2px_2px_0px_#d31611]">
+          <span className="w-2 h-2 rounded-full bg-[#d31611]"></span>
           Status: Blocked · Safety rule
         </span>
       )
@@ -72,47 +76,48 @@ export const Header: React.FC<HeaderProps> = ({
 
     if (currentScreen === 'finished') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#e1f4ec] text-[#136340]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#136340]"></span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#ebdbb7] text-[#18181b] border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b]">
+          <span className="w-2 h-2 rounded-full bg-[#18181b]"></span>
           Status: Done · Completed
         </span>
       )
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#e1f4ec] text-[#136340]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#136340] animate-pulse"></span>
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#fff4da] text-[#18181b] border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b]">
+        <span className="w-2 h-2 rounded-full bg-[#d31611] animate-ping"></span>
         Running · {statusText || formatTime(elapsedSeconds)}
       </span>
     )
   }
 
   return (
-    <header className="border-b border-[#ece9e2] bg-[#faf9f5] px-6 py-3 flex items-center justify-between text-sm select-none">
-      {/* Left side matching Image 1 & Image 2 */}
+    <header className="border-b border-[#e5e5e5] bg-[#fffdf8] px-6 py-3.5 flex items-center justify-between text-sm select-none">
+      {/* Left side: Brand with Geist 800 weight & tight tracking */}
       <div className="flex items-center gap-3">
         <button
           onClick={onNavigateHome}
-          className="font-bold text-base text-[#18533e] tracking-tight hover:opacity-90 transition min-h-[44px] flex items-center cursor-pointer"
+          className="font-extrabold text-lg text-[#18181b] tracking-[-0.04em] hover:opacity-90 transition min-h-[44px] flex items-center cursor-pointer font-geist"
         >
-          DevPilot
+          <span>AgentGate</span>
+          <span className="text-[#d31611]">.</span>
         </button>
 
-        {/* Safety Cue badge */}
-        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#f0f9f4] text-[#18533e] border border-[#cbe4d7]">
-          Test repo only
+        {/* GitReverse Style Tag */}
+        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#fff4da] text-[#18181b] border border-[#18181b]">
+          SWE Agent
         </span>
 
         {/* Breadcrumb / Context */}
         {currentScreen === 'setup' ? (
-          <span className="text-[#68655e] text-xs font-normal">New run</span>
+          <span className="text-[#666666] text-xs font-medium">Configure run</span>
         ) : (
-          <div className="hidden sm:flex items-center gap-2 text-xs text-[#5a5750]">
-            <span className="text-slate-300">·</span>
-            <span className="font-medium text-[#22211f]">{repo}</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-[#68655e] truncate max-w-sm">
-              Issue #{issueNumber} {issueTitle}
+          <div className="hidden sm:flex items-center gap-2 text-xs text-[#666666]">
+            <span>/</span>
+            <span className="font-bold text-[#18181b]">{repo}</span>
+            <span>/</span>
+            <span className="text-[#666666] truncate max-w-sm">
+              #{issueNumber} {issueTitle}
             </span>
           </div>
         )}
@@ -120,19 +125,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right side: Canvas screen selector & status */}
       <div className="flex items-center gap-3">
-        {/* Integrated Canvas Switcher in single header */}
-        <div className="flex items-center gap-1.5 bg-[#f0ede6] px-2.5 py-1.5 rounded-xl border border-[#e2dfd7] text-xs">
-          <label htmlFor="canvas-screen-select" className="text-[#8c8980] text-[11px] font-medium hidden md:inline">
-            Canvas screen:
+        {/* Integrated Canvas Switcher in GitReverse Box */}
+        <div className="flex items-center gap-2 bg-[#fffdf8] px-3 py-1.5 rounded-md border-2 border-[#18181b] text-xs shadow-[2px_2px_0px_#18181b]">
+          <label htmlFor="canvas-screen-select" className="text-[#666666] text-[11px] font-bold hidden md:inline uppercase tracking-wider">
+            Screen:
           </label>
           <select
             id="canvas-screen-select"
             value={currentScreen}
             onChange={(e) => onSelectScreen(e.target.value as ScreenId)}
-            className="bg-transparent text-xs font-semibold text-[#18533e] cursor-pointer focus:outline-none"
+            className="bg-transparent text-xs font-bold text-[#18181b] cursor-pointer focus:outline-none"
           >
             {SCREENS.map((s) => (
-              <option key={s.id} value={s.id} className="bg-white text-[#1a1918]">
+              <option key={s.id} value={s.id} className="bg-[#fffdf8] text-[#18181b]">
                 {s.label}
               </option>
             ))}
@@ -141,10 +146,30 @@ export const Header: React.FC<HeaderProps> = ({
 
         {renderStatus()}
 
+        {onToggleWorkflowGraph && (
+          <button
+            type="button"
+            onClick={onToggleWorkflowGraph}
+            className={`min-h-[38px] px-3.5 rounded-md text-xs font-bold border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#18181b] transition flex items-center gap-1.5 cursor-pointer ${
+              showWorkflowGraph
+                ? 'bg-[#fff4da] text-[#d31611]'
+                : 'bg-[#fffdf8] text-[#18181b]'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                showWorkflowGraph ? 'bg-[#d31611]' : 'bg-[#18181b]'
+              }`}
+            />
+            <span className="hidden sm:inline">Workflow Graph</span>
+            <span className="sm:hidden">Graph</span>
+          </button>
+        )}
+
         {currentScreen !== 'setup' && (
           <button
             onClick={onNavigateHome}
-            className="min-h-[44px] px-3 rounded-lg text-xs font-medium text-[#52504a] hover:text-[#18533e] hover:bg-[#f0ede6] transition flex items-center cursor-pointer"
+            className="min-h-[38px] px-3.5 rounded-md text-xs font-bold text-[#18181b] bg-[#ebdbb7] border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_#18181b] transition flex items-center cursor-pointer"
           >
             New run
           </button>

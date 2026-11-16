@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { AlertCircle, Bug, CheckCircle2, GitBranch, Loader2, Sparkles, X } from 'lucide-react'
+import { Loader2, Sparkles, X } from 'lucide-react'
 import type { CreateRunRequest } from '../types'
 import { createRun } from '../services/api'
 
@@ -11,11 +11,11 @@ interface CreateRunModalProps {
 
 const PRESETS = [
   {
-    name: 'Memory Leak Bug',
-    repo: 'facebook/react',
-    issue_url: 'https://github.com/facebook/react/issues/28910',
-    title: 'Fix memory leak in component unmount cleanup cycle',
-    description: 'DOM listeners attached during mount are not dereferenced when component unmounts prematurely.',
+    name: 'Token Expiration Bug',
+    repo: 'priya/shop-api',
+    issue_url: 'https://github.com/priya/shop-api/issues/60',
+    title: 'Login tokens never expire',
+    description: 'System fails to validate UTC expiration timestamps during session verification.',
   },
   {
     name: 'Invalid JSON Crash',
@@ -69,162 +69,133 @@ export const CreateRunModal: React.FC<CreateRunModalProps> = ({ isOpen, onClose,
       onRunCreated(res.thread_id)
       onClose()
     } catch (err: any) {
-      setError(err.message || 'Failed to initialize agent run.')
+      setError(err.message || 'Failed to create run.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-              <Bug className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Initialize Autonomous SWE Run</h2>
-              <p className="text-xs text-slate-400">Launch LangGraph multi-agent bug resolution workflow</p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#18181b]/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-[#fffdf8] border-2 border-[#18181b] rounded-xl max-w-xl w-full p-6 shadow-[6px_6px_0px_#18181b] relative space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181b]">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-[#d31611] text-white flex items-center justify-center border border-[#18181b]">
+              <Sparkles className="w-4 h-4" />
+            </span>
+            <h2 className="text-base font-extrabold text-[#18181b] font-geist">
+              Launch Autonomous SWE Run
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800/60 transition"
+            className="text-[#666666] hover:text-[#18181b] font-bold p-1 rounded-md"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[80vh]">
-          {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>{error}</span>
-            </div>
-          )}
+        {/* Quick Presets */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-[#18181b] uppercase tracking-wider">
+            Quick Presets:
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((p, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleApplyPreset(p)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-md border-2 border-[#18181b] transition cursor-pointer ${
+                  formData.repo === p.repo
+                    ? 'bg-[#fff4da] text-[#18181b] shadow-[2px_2px_0px_#18181b]'
+                    : 'bg-white text-[#666666] hover:bg-[#fffdf8]'
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* Quick Preset Selector */}
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Quick Sample Presets</span>
+            <label className="block text-xs font-bold text-[#18181b] mb-1">
+              Target Repository (Whitelisted):
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => handleApplyPreset(preset)}
-                  className={`text-left p-2.5 rounded-xl border text-xs transition flex flex-col justify-between ${
-                    formData.issue_url === preset.issue_url
-                      ? 'border-indigo-500 bg-indigo-500/10 text-white font-medium'
-                      : 'border-slate-800 bg-slate-950/40 text-slate-300 hover:border-slate-700 hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span className="font-semibold">{preset.name}</span>
-                  <span className="text-[11px] text-slate-500 truncate mt-1">{preset.repo}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Repository & Issue URL */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Target Repository <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <GitBranch className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
-                <input
-                  type="text"
-                  required
-                  placeholder="owner/repo"
-                  value={formData.repo}
-                  onChange={(e) => setFormData({ ...formData, repo: e.target.value })}
-                  className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                GitHub Issue URL <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="url"
-                required
-                placeholder="https://github.com/org/repo/issues/42"
-                value={formData.issue_url}
-                onChange={(e) => setFormData({ ...formData, issue_url: e.target.value })}
-                className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Issue Title */}
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Issue Title</label>
             <input
               type="text"
-              placeholder="Brief summary of the issue or bug"
-              value={formData.issue_title}
-              onChange={(e) => setFormData({ ...formData, issue_title: e.target.value })}
-              className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              required
+              value={formData.repo}
+              onChange={(e) => setFormData({ ...formData, repo: e.target.value })}
+              placeholder="priya/shop-api"
+              className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
             />
           </div>
 
-          {/* Issue Description */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Issue Description / Reproduction Steps
+            <label className="block text-xs font-bold text-[#18181b] mb-1">
+              GitHub Issue URL:
+            </label>
+            <input
+              type="url"
+              required
+              value={formData.issue_url}
+              onChange={(e) => setFormData({ ...formData, issue_url: e.target.value })}
+              placeholder="https://github.com/priya/shop-api/issues/60"
+              className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#18181b] mb-1">
+              Issue Title:
+            </label>
+            <input
+              type="text"
+              value={formData.issue_title || ''}
+              onChange={(e) => setFormData({ ...formData, issue_title: e.target.value })}
+              placeholder="Login tokens never expire"
+              className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#18181b] mb-1">
+              Description / Reproduction Context:
             </label>
             <textarea
               rows={3}
-              placeholder="Describe error logs, stack traces, expected vs actual behavior..."
-              value={formData.issue_description}
+              value={formData.issue_description || ''}
               onChange={(e) => setFormData({ ...formData, issue_description: e.target.value })}
-              className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 resize-none"
+              placeholder="Describe error symptoms, reproduction steps, or bug details..."
+              className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
             />
           </div>
 
-          {/* Pipeline Notice */}
-          <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5 text-xs text-slate-400">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-slate-300 font-medium">Automatic Guardrails &amp; Sandbox Execution</p>
-              <p className="mt-0.5 text-[11px]">
-                AgentGate will sandbox candidate patches using E2B, verify pytest outcomes, and trigger Human-In-The-Loop review if risk exceeds 0.70.
-              </p>
+          {error && (
+            <div className="p-3 bg-[#fff4da] border-2 border-[#d31611] rounded-md text-xs text-[#d31611] font-bold">
+              {error}
             </div>
-          </div>
+          )}
 
-          {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t-2 border-[#18181b]">
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+              className="btn-outline-dark text-xs py-2 px-4"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg shadow-indigo-600/30 transition"
+              className="btn-cta text-xs py-2 px-5 flex items-center gap-1.5"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Starting Workflow...</span>
-                </>
-              ) : (
-                <span>Launch SWE Workflow</span>
-              )}
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>{loading ? 'Launching Agent...' : 'Launch SWE Agent'}</span>
             </button>
           </div>
         </form>
@@ -232,4 +203,3 @@ export const CreateRunModal: React.FC<CreateRunModalProps> = ({ isOpen, onClose,
     </div>
   )
 }
-

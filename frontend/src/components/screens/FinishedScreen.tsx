@@ -10,14 +10,12 @@ interface FinishedScreenProps {
 
 export const FinishedScreen: React.FC<FinishedScreenProps> = ({
   prUrl = 'https://github.com/priya/shop-api/pull/42',
-  prTitle = 'fix(auth): enforce session token expiration and refresh verification',
   prNumber = 42,
   repo = 'priya/shop-api',
   onStartNewRun,
 }) => {
   const [copied, setCopied] = useState(false)
 
-  // Clean URL to prevent duplicate https://github.com/ prefixes
   const cleanPrUrl = (url?: string | null): string => {
     if (!url) return '#'
     let cleaned = url.trim()
@@ -61,220 +59,152 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto px-6 py-8 space-y-7 animate-in fade-in duration-200">
-      {/* 1. PR Link Card / Success Header */}
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-3.5 animate-in fade-in duration-200">
+      {/* Compact Top Horizontal Celebration Card with Metric Badges */}
       <section
         aria-labelledby="pr-success-heading"
-        className="bg-[#f0f9f4] border-2 border-[#cbe4d7] rounded-2xl p-6 shadow-sm space-y-4"
+        className="bg-[#fff4da] border-2 border-[#18181b] rounded-xl p-3.5 shadow-[3px_3px_0px_#18181b] flex flex-col md:flex-row md:items-center justify-between gap-3"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#18533e] text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5 shadow-xs">
-              ✓
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#e1f4ec] text-[#136340]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#136340]"></span>
-                  Status: Done · Completed
-                </span>
-                <span className="text-xs text-[#52504a]">Branch: <code className="font-mono bg-white/80 px-1.5 py-0.5 rounded border border-[#cbe4d7]">agent/fix-session-expiration</code></span>
-              </div>
-              <h1 id="pr-success-heading" className="text-lg font-bold text-[#1a1918] mt-1.5">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-md bg-[#d31611] text-white flex items-center justify-center font-black text-sm shrink-0 border border-[#18181b]">
+            ✓
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 id="pr-success-heading" className="text-base sm:text-lg font-extrabold text-[#18181b] font-geist">
                 Pull Request #{displayPrNumber} Published
               </h1>
-              <p className="text-xs text-[#52504a] mt-0.5">
-                Target: <span className="font-medium text-[#1a1918]">{repo.replace(/^https?:\/\/github\.com\//i, '')}</span> &larr; merged from verified sandbox patch
-              </p>
+              <span className="badge-warm text-[10px]">Status: Done</span>
             </div>
+            <p className="text-[11px] text-[#666666] font-medium">
+              Target: <span className="font-bold text-[#18181b]">{repo.replace(/^https?:\/\/github\.com\//i, '')}</span> &larr; merged from verified sandbox patch
+            </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <a
-              href={finalUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="min-h-[44px] px-5 bg-[#18533e] text-white rounded-xl text-xs font-semibold hover:bg-[#124231] transition flex items-center justify-center gap-2 shadow-xs"
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="px-2 py-1 rounded bg-white border border-[#18181b] text-[11px] font-bold">
+            ✓ 26/26 Tests
+          </span>
+          <span className="px-2 py-1 rounded bg-white border border-[#18181b] text-[11px] font-bold">
+            +1.8% Cov
+          </span>
+          <span className="px-2 py-1 rounded bg-white border border-[#18181b] text-[11px] font-bold">
+            0.30 Low Risk
+          </span>
+          <a
+            href={finalUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-cta text-xs py-1.5 px-3.5 inline-flex items-center gap-1.5 font-bold"
+          >
+            <span>View on GitHub</span>
+            <span aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
+      </section>
+
+      {/* Main 2-Column Split Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+        {/* LEFT COLUMN: Pull Request Description Preview (7 cols) */}
+        <section className="lg:col-span-7 card-canvas-elevated p-4 flex flex-col h-[520px]">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-[#18181b] font-geist">
+                Pull Request Body Markdown
+              </span>
+              <span className="badge-warm text-[10px]">Ready for Review</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="btn-outline-dark text-xs py-1 px-2.5 flex items-center gap-1"
             >
-              <span>View on GitHub</span>
-              <span aria-hidden="true">↗</span>
-            </a>
+              {copied ? '✓ Copied' : 'Copy markdown'}
+            </button>
           </div>
-        </div>
-      </section>
 
-      {/* 2. Stat Tiles */}
-      <section aria-label="Run Metrics" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-[#e8e6df] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <p className="text-[11px] font-medium text-[#8c8980] uppercase tracking-wider">Duration</p>
-          <p className="text-xl font-bold text-[#1a1918] mt-1">1m 24s</p>
-          <p className="text-[11px] text-[#136340] font-medium mt-0.5">Total pipeline time</p>
-        </div>
+          <div className="flex-1 mt-2.5 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 leading-relaxed border-2 border-[#18181b] select-text">
+            <pre className="whitespace-pre-wrap font-mono text-[11px] text-slate-200">
+              {prBody}
+            </pre>
+          </div>
+        </section>
 
-        <div className="bg-white border border-[#e8e6df] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <p className="text-[11px] font-medium text-[#8c8980] uppercase tracking-wider">Sandbox attempts</p>
-          <p className="text-xl font-bold text-[#1a1918] mt-1">2 / 3</p>
-          <p className="text-[11px] text-[#52504a] mt-0.5">Resolved in attempt 2</p>
-        </div>
-
-        <div className="bg-white border border-[#e8e6df] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <p className="text-[11px] font-medium text-[#8c8980] uppercase tracking-wider">Test Suite</p>
-          <p className="text-xl font-bold text-[#1a1918] mt-1">26 / 26</p>
-          <p className="text-[11px] text-[#136340] font-medium mt-0.5">100% passed (+2 new)</p>
-        </div>
-
-        <div className="bg-white border border-[#e8e6df] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <p className="text-[11px] font-medium text-[#8c8980] uppercase tracking-wider">Risk Score</p>
-          <p className="text-xl font-bold text-[#136340] mt-1">0.30</p>
-          <p className="text-[11px] text-[#136340] font-medium mt-0.5">Status: Low Risk · Approved</p>
-        </div>
-      </section>
-
-      {/* 3. Pipeline Recap */}
-      <section className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#1a1918]">Pipeline Recap</h2>
-          <span className="text-xs text-[#8c8980]">7 of 7 stages completed</span>
-        </div>
-
-        <ol className="divide-y divide-[#f2f0ea] text-xs">
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">1. Guardrail safety validation</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f5f4ef] text-[#716e66] border border-[#e8e6df]">
-                Background
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">0.8s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">2. Codebase research & root cause analysis</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f5f4ef] text-[#716e66] border border-[#e8e6df]">
-                Background
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">14.2s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">3. Sandbox execution (attempt 2 of 3)</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">32.1s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">4. Verification & security scan</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">18.4s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">5. PR quality review & risk scoring</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">8.9s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">6. Human approval gate</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">Manual</span>
-              <span className="font-semibold text-[#136340]">Status: Done · Approved</span>
-            </div>
-          </li>
-
-          <li className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-[#e1f4ec] text-[#136340] flex items-center justify-center font-bold text-[10px]">
-                ✓
-              </span>
-              <span className="font-medium text-[#1a1918]">7. PR agent creation & branch push</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[#8c8980]">9.6s</span>
-              <span className="font-semibold text-[#136340]">Status: Done</span>
-            </div>
-          </li>
-        </ol>
-      </section>
-
-      {/* 4. PR Description Preview */}
-      <section className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
-        <div className="flex items-center justify-between">
+        {/* RIGHT COLUMN: Pipeline Audit & Sandbox Cleanup (5 cols) */}
+        <section className="lg:col-span-5 card-canvas-elevated p-4 flex flex-col h-[520px] justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[#1a1918]">Pull Request Description Preview</h2>
-            <p className="text-xs text-[#8c8980] mt-0.5">{prTitle}</p>
+            <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
+              <span className="text-xs font-extrabold text-[#18181b] font-geist">
+                Multi-Agent Pipeline Audit
+              </span>
+              <span className="text-[10px] font-bold text-[#666666]">
+                Total: 72s
+              </span>
+            </div>
+
+            <div className="space-y-2 mt-2.5 text-xs">
+              <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="font-bold text-[#18181b]">1. Guardrail</span>
+                </div>
+                <span className="text-[11px] text-[#666666]">Passed (0.8s)</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="font-bold text-[#18181b]">2. Supervisor &amp; Research</span>
+                </div>
+                <span className="text-[11px] text-[#666666]">Fan-out complete (4.2s)</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="font-bold text-[#18181b]">3. Sandbox &amp; Verification</span>
+                </div>
+                <span className="text-[11px] text-[#666666]">Attempt 2 passed (31.4s)</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="font-bold text-[#18181b]">4. HITL Approval Sign-Off</span>
+                </div>
+                <span className="text-[11px] text-[#666666]">Approved by engineer (18.2s)</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded bg-[#fff4da] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b]">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-[#d31611] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                  <span className="font-bold text-[#18181b]">5. PR Published</span>
+                </div>
+                <span className="text-[11px] font-bold text-[#d31611]">PR #{displayPrNumber}</span>
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="min-h-[44px] px-3 rounded-lg border border-[#e2dfd7] bg-[#fdfcf9] hover:bg-[#f0ede6] text-xs font-semibold text-[#18533e] transition flex items-center gap-1.5 cursor-pointer"
-          >
-            {copied ? '✓ Copied' : 'Copy markdown'}
-          </button>
-        </div>
 
-        <div className="bg-[#fcfbf9] border border-[#ece9e2] rounded-xl p-4 text-xs font-mono text-[#383633] whitespace-pre-wrap leading-relaxed overflow-x-auto">
-          {prBody}
-        </div>
-      </section>
+          <div className="pt-3 border-t border-[#e5e5e5] space-y-2">
+            <div className="p-2.5 rounded bg-[#fffdf8] border border-[#18181b] text-[11px] flex items-center justify-between">
+              <span className="font-medium text-[#18181b]">Firecracker MicroVM</span>
+              <span className="text-[#4ade80] font-bold font-mono">Cleaned up &amp; terminated</span>
+            </div>
 
-      {/* 5. Next Steps / Actions */}
-      <div className="flex items-center justify-between pt-2">
-        <span className="text-xs text-[#8c8980]">
-          Cleaned up sandbox environment <code className="font-mono bg-white px-1 py-0.5 rounded border border-[#e8e6df]">sbx_8f21</code>. No active lingering containers.
-        </span>
-
-        {onStartNewRun && (
-          <button
-            type="button"
-            onClick={onStartNewRun}
-            className="min-h-[44px] px-5 bg-[#18533e] text-white rounded-xl text-xs font-semibold hover:bg-[#124231] transition cursor-pointer"
-          >
-            Start another run
-          </button>
-        )}
+            {onStartNewRun && (
+              <button
+                type="button"
+                onClick={onStartNewRun}
+                className="w-full btn-outline-dark py-2 text-xs font-bold text-center block"
+              >
+                Launch another run &rarr;
+              </button>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   )
 }
-

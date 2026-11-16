@@ -1,17 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --bg-canvas: #faf9f5;
-  --bg-card: #ffffff;
-  --border-subtle: #e7e5de;
-  --forest-green: #18533e;
-  --forest-hover: #134433;
+@layer base {
+  :root {
+    --color-primary: #d31611;
+    --color-bg: #fffdf8;
+    --color-text: #18181b;
+    --color-text-secondary: #666666;
+    --color-border: #e5e5e5;
+    --palette-1: #fff4da;
+    --palette-2: #fffdf8;
+    --palette-3: #ebdbb7;
+    --palette-4: #d31611;
+  }
+
+  body {
+    background-color: #fffdf8;
+    color: #18181b;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Geist', sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  code, pre, kbd {
+    font-family: 'Geist Mono', monospace;
+  }
 }
 
-body {
-  background-color: #faf9f5;
-  color: #1a1918;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Custom GitReverse inspired utility classes */
+.font-geist {
+  font-family: 'Geist', sans-serif;
+}
+
+.font-geist-mono {
+  font-family: 'Geist Mono', monospace;
+}
+
+/* GitReverse Button Styles */
+.btn-cta {
+  background: #d31611;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid #18181b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 2px 2px 0px #18181b;
+}
+
+.btn-cta:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #18181b;
+}
+
+.btn-cta:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px #18181b;
+}
+
+.btn-outline-dark {
+  background: #ffffff;
+  color: #18181b;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid #18181b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 2px 2px 0px #18181b;
+}
+
+.btn-outline-dark:hover {
+  background: #fffdf8;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #18181b;
+}
+
+.btn-outline-dark:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px #18181b;
+}
+
+.btn-warm {
+  background: #ebdbb7;
+  color: #18181b;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid #18181b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 2px 2px 0px #18181b;
+}
+
+.btn-warm:hover {
+  background: #fff4da;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #18181b;
+}
+
+.badge-warm {
+  background: #fff4da;
+  color: #18181b;
+  border: 1.5px solid #18181b;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.badge-accent {
+  background: #d31611;
+  color: #ffffff;
+  border: 1.5px solid #18181b;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.card-canvas {
+  background: #ffffff;
+  border: 1.5px solid #e5e5e5;
+  border-radius: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.card-canvas-elevated {
+  background: #ffffff;
+  border: 2px solid #18181b;
+  border-radius: 12px;
+  box-shadow: 3px 3px 0px #18181b;
 }

@@ -31,7 +31,6 @@ const DEFAULT_REPOS: RepoOption[] = [
 ]
 
 export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = false }) => {
-  // Credentials state matching Image 1
   const [e2bStatus] = useState<string>('Connected')
   const [llmStatus] = useState<string>('Connected')
   const [githubToken, setGithubToken] = useState<string>(() => {
@@ -40,11 +39,8 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = fals
   const [isTokenVerified, setIsTokenVerified] = useState<boolean>(true)
   const [tokenInput, setTokenInput] = useState<string>('')
 
-  // Repository selection state
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedRepo, setSelectedRepo] = useState<string>('priya/shop-api')
-
-  // Issue URL state
   const [issueUrl, setIssueUrl] = useState<string>('https://github.com/priya/shop-api/issues/60')
 
   const handleVerifyToken = (e: React.FormEvent) => {
@@ -65,13 +61,21 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = fals
     }
   }
 
-  const handleStartRun = () => {
-    const activeRepo = DEFAULT_REPOS.find((r) => r.name === selectedRepo)
+  const handleIssueUrlChange = (url: string) => {
+    setIssueUrl(url)
+    const match = url.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)/)
+    if (match && match[1]) {
+      setSelectedRepo(match[1])
+    }
+  }
+
+  const handleStart = () => {
+    const active = DEFAULT_REPOS.find((r) => r.name === selectedRepo)
     onStartRun({
       repo: selectedRepo,
       issue_url: issueUrl,
-      issue_title: activeRepo?.defaultIssueTitle || 'Fix issue in repository',
-      issue_description: 'Autonomous resolution of reported bug and test verification.',
+      issue_title: active?.defaultIssueTitle || `Resolve issue in ${selectedRepo}`,
+      issue_description: 'Autonomous resolution of reported bug and test suite verification.',
     })
   }
 
@@ -82,186 +86,148 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = fals
   const isFormValid = isTokenVerified && selectedRepo && issueUrl.trim().length > 0
 
   return (
-    <div className="max-w-3xl w-full mx-auto px-4 py-10 space-y-8 animate-in fade-in duration-200">
-      {/* Title */}
-      <h1 className="text-2xl font-normal text-[#1a1918] tracking-tight">
-        Set up before the first run
-      </h1>
+    <div className="max-w-3xl w-full mx-auto px-4 py-8 space-y-7 animate-in fade-in duration-200">
+      <div>
+        <span className="badge-warm mb-2 inline-block">Pre-Flight Checklist</span>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-[#18181b] tracking-[-0.04em] font-geist leading-tight">
+          Set up before the first run
+        </h1>
+        <p className="text-sm text-[#666666] mt-1.5 font-medium">
+          Verify credentials, select an authorized repository, and link the GitHub issue.
+        </p>
+      </div>
 
       {/* 1. Credentials Card */}
-      <div className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-5">
-        <div className="flex items-baseline justify-between pb-1">
-          <h2 className="text-sm font-semibold text-[#1a1918]">1. Credentials</h2>
-          <span className="text-xs text-[#8c8980]">
-            Stored on the server, never sent to the sandbox
+      <section className="card-canvas-elevated p-6 space-y-4">
+        <div className="flex items-baseline justify-between pb-2 border-b border-[#e5e5e5]">
+          <h2 className="text-base font-extrabold text-[#18181b] font-geist">
+            1. Credentials
+          </h2>
+          <span className="text-xs text-[#666666] font-medium">
+            Stored server-side · Never sent to sandboxes
           </span>
         </div>
 
-        {/* E2B row */}
-        <div className="flex items-center justify-between text-sm py-1 border-b border-[#f2f0ea]">
-          <span className="text-[#302e2b]">E2B sandbox key</span>
-          <span className="text-xs font-medium text-[#1b6348]">{e2bStatus}</span>
+        <div className="flex items-center justify-between text-xs py-2 border-b border-[#e5e5e5]">
+          <span className="font-bold text-[#18181b]">E2B sandbox key</span>
+          <span className="badge-warm">{e2bStatus}</span>
         </div>
 
-        {/* LLM key row */}
-        <div className="flex items-center justify-between text-sm py-1 border-b border-[#f2f0ea]">
-          <span className="text-[#302e2b]">LLM key</span>
-          <span className="text-xs font-medium text-[#1b6348]">{llmStatus}</span>
+        <div className="flex items-center justify-between text-xs py-2 border-b border-[#e5e5e5]">
+          <span className="font-bold text-[#18181b]">LLM Provider</span>
+          <span className="badge-warm">{llmStatus}</span>
         </div>
 
-        {/* GitHub token section */}
         {isTokenVerified ? (
-          <div className="flex items-center justify-between text-sm py-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[#302e2b]">GitHub token</span>
-              <span className="text-xs text-[#8c8980]">
-                ({githubToken.slice(0, 14)}...)
-              </span>
-            </div>
+          <div className="flex items-center justify-between text-xs py-2">
+            <span className="font-bold text-[#18181b]">
+              GitHub token <span className="text-[#666666] font-mono font-normal">({githubToken.slice(0, 14)}...)</span>
+            </span>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-[#1b6348]">Connected</span>
+              <span className="badge-warm">Connected</span>
               <button
+                type="button"
                 onClick={() => setIsTokenVerified(false)}
-                className="text-xs text-[#6e6a62] hover:text-[#18533e] underline"
+                className="text-xs font-bold text-[#d31611] hover:underline cursor-pointer"
               >
                 Change
               </button>
             </div>
           </div>
         ) : (
-          <div className="bg-[#fef5ea] border border-[#fae3cd] rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-[#8a5314]">GitHub token</span>
-              <span className="text-xs font-semibold text-[#8a5314]">Missing</span>
-            </div>
-            <p className="text-xs text-[#7d5019]">
-              Fine-grained token with contents and pull requests access for your test repo only
-            </p>
+          <div className="bg-[#fff4da] border-2 border-[#18181b] rounded-lg p-4 space-y-3">
+            <span className="text-xs font-bold text-[#18181b]">Add GitHub Personal Access Token:</span>
             <form onSubmit={handleVerifyToken} className="flex gap-2">
               <input
                 type="password"
-                placeholder="github_pat_..."
+                required
+                placeholder="ghp_..."
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
-                className="flex-1 bg-white border border-[#e5decb] rounded-lg px-3 py-2 text-xs text-[#201e1b] placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#18533e]"
+                className="flex-1 bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b]"
               />
-              <button
-                type="submit"
-                className="bg-[#18533e] hover:bg-[#134433] text-white text-xs font-medium px-4 py-2 rounded-lg transition"
-              >
-                Save and verify
+              <button type="submit" className="btn-cta text-xs">
+                Save & Verify
               </button>
             </form>
           </div>
         )}
-      </div>
+      </section>
 
       {/* 2. Repository Card */}
-      <div className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-[#1a1918]">2. Repository</h2>
-          <p className="text-xs text-[#8c8980] mt-0.5">
-            Search repos (available after the token is verified)
-          </p>
-        </div>
-
-        {/* Search input */}
+      <section className="card-canvas-elevated p-6 space-y-4">
+        <h2 className="text-base font-extrabold text-[#18181b] font-geist">2. Repository</h2>
         <input
           type="text"
-          placeholder="Search"
+          placeholder="Search repositories..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white border border-[#e5e2db] rounded-lg px-3.5 py-2 text-xs text-[#201e1b] placeholder-[#9c978f] focus:outline-none focus:border-[#18533e]"
+          className="w-full bg-white border-2 border-[#18181b] rounded-md px-3.5 py-2.5 text-xs text-[#18181b]"
         />
 
-        {/* Repo radio list */}
         <div className="space-y-2 pt-1">
           {filteredRepos.map((repo) => {
             const isSelected = selectedRepo === repo.name
             const isAllowed = repo.status !== 'not-allowed'
 
-            let rowStyle = 'border border-[#e7e5de] hover:border-[#cdc9bf]'
-            if (isSelected) {
-              rowStyle = 'border-2 border-[#18533e] bg-[#f8faf8]'
-            } else if (!isAllowed) {
-              rowStyle = 'border border-[#eeebe5] bg-[#faf8f5] opacity-60 cursor-not-allowed'
-            }
-
             return (
               <div
                 key={repo.name}
                 onClick={() => handleSelectRepo(repo)}
-                className={`rounded-xl p-3.5 flex items-center justify-between text-xs transition cursor-pointer select-none ${rowStyle}`}
+                className={`p-3.5 rounded-lg border-2 text-xs flex items-center justify-between transition cursor-pointer ${
+                  isSelected
+                    ? 'border-[#18181b] bg-[#fff4da] shadow-[2px_2px_0px_#18181b]'
+                    : isAllowed
+                    ? 'border-[#e5e5e5] bg-white hover:border-[#18181b]'
+                    : 'border-[#e5e5e5] bg-[#fffdf8] opacity-60 cursor-not-allowed'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      isSelected
-                        ? 'border-[#18533e] bg-[#18533e]'
-                        : 'border-[#c5c1b6] bg-white'
+                    className={`w-4 h-4 rounded-full border-2 border-[#18181b] flex items-center justify-center ${
+                      isSelected ? 'bg-[#d31611]' : 'bg-white'
                     }`}
                   >
                     {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
                   </div>
-                  <span className={`font-medium ${isSelected ? 'text-[#18533e]' : 'text-[#2b2926]'}`}>
-                    {repo.name}
-                  </span>
+                  <span className="font-bold text-[#18181b]">{repo.name}</span>
                 </div>
-
-                <div className="text-xs">
-                  {repo.status === 'test-allowed' ? (
-                    <span className="text-[#18533e] font-medium">{repo.statusLabel}</span>
-                  ) : repo.status === 'allowed' ? (
-                    <span className="text-[#68655e]">{repo.statusLabel}</span>
-                  ) : (
-                    <span className="text-[#969288]">{repo.statusLabel}</span>
-                  )}
-                </div>
+                <span className={isAllowed ? 'badge-warm' : 'badge-accent'}>
+                  {repo.statusLabel}
+                </span>
               </div>
             )
           })}
         </div>
-      </div>
+      </section>
 
       {/* 3. Issue Card */}
-      <div className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-[#1a1918]">3. Issue</h2>
-          <p className="text-xs text-[#8c8980] mt-0.5">
-            Paste an issue URL, or pick an open issue after connecting
-          </p>
-        </div>
-
+      <section className="card-canvas-elevated p-6 space-y-3">
+        <h2 className="text-base font-extrabold text-[#18181b] font-geist">3. GitHub Issue</h2>
         <input
           type="url"
+          required
           value={issueUrl}
-          onChange={(e) => setIssueUrl(e.target.value)}
+          onChange={(e) => handleIssueUrlChange(e.target.value)}
           placeholder="https://github.com/org/repo/issues/60"
-          className="w-full bg-white border border-[#e5e2db] rounded-lg px-3.5 py-2.5 text-xs text-[#201e1b] placeholder-[#9c978f] focus:outline-none focus:border-[#18533e]"
+          className="w-full bg-white border-2 border-[#18181b] rounded-md px-3.5 py-2.5 text-xs text-[#18181b]"
         />
-      </div>
+      </section>
 
-      {/* Bottom Start Action matching Image 1 */}
+      {/* Action */}
       <div className="flex items-center gap-4 pt-2">
         <button
-          onClick={handleStartRun}
+          type="button"
+          onClick={handleStart}
           disabled={!isFormValid || loading}
-          className={`px-5 py-2.5 rounded-lg text-xs font-medium transition ${
-            isFormValid && !loading
-              ? 'bg-[#18533e] hover:bg-[#134433] text-white shadow-sm cursor-pointer'
-              : 'bg-[#d8d4cc] text-[#78746c] cursor-not-allowed'
-          }`}
+          className={isFormValid && !loading ? 'btn-cta text-sm px-8 py-3' : 'btn-warm opacity-50 cursor-not-allowed'}
         >
-          {loading ? 'Starting...' : 'Start run'}
+          {loading ? 'Starting run...' : 'Start SWE run'}
         </button>
-
-        <span className="text-xs text-[#6e6a62]">
-          {!isTokenVerified
-            ? 'Add and verify a GitHub token to continue'
-            : 'Ready to launch autonomous SWE workflow'}
+        <span className="text-xs text-[#666666] font-medium">
+          {!isTokenVerified ? 'Verify GitHub token to continue' : 'Ready to launch autonomous run'}
         </span>
       </div>
     </div>
   )
 }
-

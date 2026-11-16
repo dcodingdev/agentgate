@@ -40,111 +40,131 @@ export const ClarificationScreen: React.FC<ClarificationScreenProps> = ({
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto px-6 py-8 space-y-7 animate-in fade-in duration-200">
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-3.5 animate-in fade-in duration-200">
       {/* Attention banner */}
-      <div className="bg-[#fef5ea] border border-[#fae3cd] rounded-2xl p-4 text-[#8a5314] flex items-start gap-3">
-        <span className="w-5 h-5 rounded-full bg-[#d97706] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-          ?
-        </span>
-        <div>
-          <h1 className="text-sm font-bold text-[#8a5314]">
-            Paused: Human Clarification Needed
-          </h1>
-          <p className="text-xs text-[#7d5019] mt-0.5">
-            The research agent identified multiple architectural interpretations. Select an approach to proceed.
-          </p>
+      <div className="bg-[#fff4da] border-2 border-[#18181b] rounded-xl p-3.5 text-[#18181b] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[3px_3px_0px_#18181b]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-[#d31611] text-white flex items-center justify-center font-black text-xs shrink-0 border border-[#18181b]">
+            ?
+          </div>
+          <div>
+            <h1 className="text-sm sm:text-base font-extrabold text-[#18181b] tracking-tight font-geist">
+              Paused: Human Architectural Guidance Required
+            </h1>
+            <p className="text-[11px] text-[#666666] font-medium">
+              Supervisor identified multiple implementations. Select an approach to resume execution.
+            </p>
+          </div>
         </div>
+
+        <span className="badge-accent text-xs shrink-0">Guidance Required</span>
       </div>
 
       {isSubmitted ? (
-        <div className="p-6 bg-[#f0f9f4] border border-[#cbe4d7] rounded-2xl text-center space-y-2">
-          <h2 className="text-sm font-bold text-[#18533e]">Clarification Submitted</h2>
-          <p className="text-xs text-[#2b6a50]">
-            The agent received your architectural choice and resumed patch authoring in the sandbox.
+        <div className="p-6 bg-[#ebdbb7] border-2 border-[#18181b] rounded-xl text-center space-y-1.5 shadow-[2px_2px_0px_#18181b]">
+          <h2 className="text-base font-extrabold text-[#18181b] font-geist">Clarification Dispatched</h2>
+          <p className="text-xs text-[#18181b] font-medium">
+            The agent received your architectural preference and resumed patch synthesis inside the sandbox.
           </p>
         </div>
       ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white border border-[#e8e6df] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-6"
-        >
-          {/* The Question */}
-          <div className="space-y-1.5 pb-2 border-b border-[#f2f0ea]">
-            <span className="text-[11px] font-semibold text-[#8c8980] uppercase tracking-wider">
-              Agent Question
-            </span>
-            <h2 className="text-base font-semibold text-[#1a1918] leading-snug">
-              How should the session expiration TTL be enforced?
-            </h2>
-            <p className="text-xs text-[#6e6a62] leading-relaxed">
-              Issue #60 requests that login tokens must expire, but does not specify whether to employ an inactivity sliding window or a strict calendar expiration.
-            </p>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+          {/* LEFT COLUMN: Architectural Choice Options (7 cols) */}
+          <div className="lg:col-span-7 space-y-3">
+            <section className="card-canvas-elevated p-4 space-y-3">
+              <div className="space-y-1 pb-2.5 border-b border-[#e5e5e5]">
+                <span className="text-[11px] font-extrabold text-[#d31611] uppercase tracking-wider">
+                  Supervisor Query
+                </span>
+                <h2 className="text-xl font-extrabold text-[#18181b] leading-snug font-geist">
+                  How should the session expiration TTL be enforced?
+                </h2>
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  Issue #60 requests that login tokens must expire, but does not specify whether to employ an inactivity sliding window or a strict calendar expiration.
+                </p>
+              </div>
+
+              {/* Option cards */}
+              <div className="space-y-3" role="radiogroup" aria-label="Expiration strategy options">
+                <span className="text-xs font-extrabold text-[#18181b] uppercase tracking-wider">
+                  Select Architectural Pattern:
+                </span>
+                {OPTIONS.map((opt) => {
+                  const isSelected = selectedOption === opt.title
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedOption(opt.title)}
+                      className={`w-full min-h-[58px] p-4 rounded-lg text-left transition flex items-start justify-between cursor-pointer border-2 ${
+                        isSelected
+                          ? 'border-[#18181b] bg-[#fff4da] shadow-[2px_2px_0px_#18181b]'
+                          : 'border-[#e5e5e5] bg-white hover:border-[#18181b]'
+                      }`}
+                    >
+                      <div className="pr-3">
+                        <p className="text-xs font-extrabold text-[#18181b]">
+                          {opt.title}
+                        </p>
+                        <p className="text-[11px] text-[#666666] mt-0.5 leading-relaxed font-medium">
+                          {opt.description}
+                        </p>
+                      </div>
+
+                      <div
+                        className={`w-4 h-4 rounded-full border-2 border-[#18181b] shrink-0 mt-0.5 flex items-center justify-center ${
+                          isSelected ? 'bg-[#d31611]' : 'bg-white'
+                        }`}
+                      >
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
           </div>
 
-          {/* Option buttons */}
-          <div className="space-y-3" role="radiogroup" aria-label="Expiration strategy options">
-            <span className="text-xs font-semibold text-[#1a1918]">Select approach:</span>
-            {OPTIONS.map((opt) => {
-              const isSelected = selectedOption === opt.title
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSelectedOption(opt.title)}
-                  className={`w-full min-h-[52px] p-4 rounded-xl border text-left transition flex items-start justify-between cursor-pointer ${
-                    isSelected
-                      ? 'border-2 border-[#18533e] bg-[#f8faf8]'
-                      : 'border-[#e7e5de] bg-white hover:border-[#cdc9bf]'
-                  }`}
-                >
-                  <div className="pr-3">
-                    <p className={`text-xs font-semibold ${isSelected ? 'text-[#18533e]' : 'text-[#2b2926]'}`}>
-                      {opt.title}
-                    </p>
-                    <p className="text-[11px] text-[#706c64] mt-0.5 leading-relaxed">
-                      {opt.description}
-                    </p>
-                  </div>
+          {/* RIGHT COLUMN: Instructions & Submit Action (5 cols) */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-6">
+            <section className="card-canvas-elevated p-6 space-y-5">
+              <div className="border-b-2 border-[#18181b] pb-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-[#d31611]">
+                  Decision Dispatch
+                </span>
+                <h3 className="text-base font-extrabold text-[#18181b] font-geist mt-0.5">
+                  Confirm Guidance
+                </h3>
+              </div>
 
-                  <div
-                    className={`w-4 h-4 rounded-full border shrink-0 mt-0.5 flex items-center justify-center ${
-                      isSelected ? 'border-[#18533e] bg-[#18533e]' : 'border-[#c5c1b6] bg-white'
-                    }`}
-                  >
-                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+              <div className="space-y-2">
+                <label htmlFor="clarification-notes" className="block text-xs font-bold text-[#18181b]">
+                  Additional Constraints or Code Invariants (Optional):
+                </label>
+                <textarea
+                  id="clarification-notes"
+                  rows={4}
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  placeholder="E.g., Please ensure error messages returned to clients do not leak internal timestamps or UTC offsets."
+                  className="w-full bg-white border-2 border-[#18181b] rounded-md p-3 text-xs text-[#18181b] placeholder-[#666666] focus:outline-none focus:border-[#d31611]"
+                />
+              </div>
 
-          {/* Optional custom text box */}
-          <div className="space-y-2">
-            <label htmlFor="clarification-notes" className="block text-xs font-semibold text-[#1a1918]">
-              Additional instructions or constraints (Optional):
-            </label>
-            <textarea
-              id="clarification-notes"
-              rows={3}
-              value={customNotes}
-              onChange={(e) => setCustomNotes(e.target.value)}
-              placeholder="E.g., Please also ensure error messages returned to clients do not leak internal timestamps."
-              className="w-full bg-[#faf9f5] border border-[#dcd8ce] rounded-xl p-3 text-xs text-[#1a1918] placeholder-[#9c978f] focus:outline-none focus:border-[#18533e]"
-            />
-          </div>
+              <div className="p-3 bg-[#fff4da] border-2 border-[#18181b] rounded-md text-xs text-[#18181b] font-medium leading-relaxed">
+                Submitting this selection updates the SWE agent's execution state and triggers patch generation inside the sandbox.
+              </div>
 
-          {/* Submit Action */}
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#f2f0ea]">
-            <button
-              type="submit"
-              className="min-h-[44px] px-6 py-2.5 rounded-lg text-xs font-semibold text-white bg-[#18533e] hover:bg-[#134433] shadow-sm transition cursor-pointer"
-            >
-              Submit clarification &amp; resume
-            </button>
+              <button
+                type="submit"
+                className="w-full btn-cta py-3 text-sm text-center block"
+              >
+                Submit Guidance &amp; Resume Run &rarr;
+              </button>
+            </section>
           </div>
         </form>
       )}
     </div>
   )
 }
-

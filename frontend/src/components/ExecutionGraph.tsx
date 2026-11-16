@@ -123,34 +123,36 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
   }
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="card-canvas-elevated p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#e5e5e5]">
         <div>
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+          <h2 className="text-base font-extrabold text-[#18181b] flex items-center gap-2 font-geist">
             <span>LangGraph Multi-Agent Workflow</span>
-            <span className="text-xs font-normal text-slate-400">({status})</span>
+            <span className="badge-warm">
+              {status}
+            </span>
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-[#666666] mt-0.5 font-medium">
             Autonomous state transitions with conditional routing, checkpoints, and safety gates
           </p>
         </div>
 
         {/* Legend */}
-        <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+        <div className="flex items-center gap-3 text-[11px] font-bold text-[#18181b]">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#18181b]"></span>
             <span>Completed</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#d31611] animate-pulse"></span>
             <span>Active</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#fff4da] border border-[#18181b]"></span>
             <span>HITL Paused</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#e5e5e5] border border-[#18181b]"></span>
             <span>Pending</span>
           </div>
         </div>
@@ -163,35 +165,35 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
           const nodeStatus = getNodeStatus(node.id)
           const isSelected = selectedNode === node.id
 
-          let statusClass = 'border-slate-800/80 bg-slate-950/40 text-slate-400 hover:border-slate-700'
-          let iconClass = 'text-slate-500 bg-slate-800/40'
+          let statusClass = 'border-2 border-[#e5e5e5] bg-white text-[#666666] hover:border-[#18181b]'
+          let iconClass = 'text-[#666666] bg-[#fffdf8] border border-[#e5e5e5]'
 
           if (nodeStatus === 'completed') {
-            statusClass = 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
-            iconClass = 'text-emerald-400 bg-emerald-500/10'
+            statusClass = 'border-2 border-[#18181b] bg-[#ebdbb7] text-[#18181b] shadow-[2px_2px_0px_#18181b]'
+            iconClass = 'text-[#18181b] bg-white border border-[#18181b]'
           } else if (nodeStatus === 'active') {
-            statusClass = 'border-indigo-500 bg-indigo-950/30 text-indigo-200 ring-2 ring-indigo-500/30'
-            iconClass = 'text-indigo-400 bg-indigo-500/20 animate-spin'
+            statusClass = 'border-2 border-[#18181b] bg-[#fff4da] text-[#d31611] shadow-[2px_2px_0px_#18181b]'
+            iconClass = 'text-white bg-[#d31611] border border-[#18181b] animate-spin'
           } else if (nodeStatus === 'paused') {
-            statusClass = 'border-amber-500 bg-amber-950/30 text-amber-200 ring-2 ring-amber-500/40'
-            iconClass = 'text-amber-400 bg-amber-500/20 animate-bounce'
+            statusClass = 'border-2 border-[#d31611] bg-[#fff4da] text-[#d31611] shadow-[2px_2px_0px_#d31611]'
+            iconClass = 'text-white bg-[#d31611] border border-[#18181b] animate-bounce'
           } else if (nodeStatus === 'rejected') {
-            statusClass = 'border-rose-500 bg-rose-950/30 text-rose-300 ring-2 ring-rose-500/40'
-            iconClass = 'text-rose-400 bg-rose-500/20'
+            statusClass = 'border-2 border-[#d31611] bg-[#fffdf8] text-[#d31611] shadow-[2px_2px_0px_#d31611]'
+            iconClass = 'text-white bg-[#d31611] border border-[#18181b]'
           }
 
           if (isSelected) {
-            statusClass += ' ring-2 ring-white/50'
+            statusClass += ' ring-2 ring-[#d31611]'
           }
 
           return (
             <button
               key={node.id}
               onClick={() => onSelectNode(node.id)}
-              className={`p-3 rounded-xl border text-left flex flex-col justify-between transition relative overflow-hidden group cursor-pointer ${statusClass}`}
+              className={`p-3 rounded-lg text-left flex flex-col justify-between transition relative overflow-hidden group cursor-pointer min-h-[96px] ${statusClass}`}
             >
               <div className="flex items-center justify-between w-full mb-2">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${iconClass}`}>
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center ${iconClass}`}>
                   {nodeStatus === 'active' ? (
                     <Loader2 className="w-4 h-4" />
                   ) : nodeStatus === 'paused' ? (
@@ -201,12 +203,12 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
                   )}
                 </div>
 
-                {nodeStatus === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />}
+                {nodeStatus === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-[#18181b]" />}
               </div>
 
               <div>
-                <p className="font-semibold text-xs text-white leading-snug">{node.title}</p>
-                <p className="text-[10px] text-slate-400 truncate mt-0.5">{node.role}</p>
+                <p className="font-extrabold text-xs text-[#18181b] leading-tight font-geist">{node.title}</p>
+                <p className="text-[10px] text-[#666666] truncate mt-0.5 font-medium">{node.role}</p>
               </div>
             </button>
           )
@@ -215,18 +217,18 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
 
       {/* Selected Node Details Drawer/Banner */}
       {selectedNode && (
-        <div className="mt-3 p-3.5 bg-slate-950/50 border border-slate-800 rounded-xl flex items-start justify-between gap-4 text-xs animate-in fade-in duration-150">
+        <div className="mt-3 p-4 bg-[#fff4da] border-2 border-[#18181b] rounded-lg flex items-start justify-between gap-4 text-xs animate-in fade-in duration-150 shadow-[2px_2px_0px_#18181b]">
           <div>
-            <span className="font-semibold text-indigo-400 uppercase tracking-wider text-[10px]">
+            <span className="font-extrabold text-[#d31611] uppercase tracking-wider text-[11px]">
               Node Overview: {selectedNode}
             </span>
-            <p className="text-slate-300 mt-0.5">
+            <p className="text-[#18181b] mt-1 font-medium leading-relaxed">
               {NODES_PIPELINE.find((n) => n.id === selectedNode)?.description}
             </p>
           </div>
           <button
             onClick={() => onSelectNode(null as any)}
-            className="text-slate-500 hover:text-slate-300 px-2 py-1 rounded text-[11px] hover:bg-slate-800/40"
+            className="btn-outline-dark text-xs py-1 px-2.5"
           >
             Dismiss
           </button>
@@ -235,4 +237,3 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
     </div>
   )
 }
-

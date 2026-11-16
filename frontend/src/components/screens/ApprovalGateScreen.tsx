@@ -33,7 +33,6 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
 
   const handleSubmitReject = (e: React.FormEvent) => {
     e.preventDefault()
-    // PRD requirement: Feedback is strictly required for rejection!
     if (!feedback.trim()) {
       setErrorMessage('Feedback is required when rejecting so the agent understands why.')
       return
@@ -43,210 +42,209 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   }
 
   return (
-    <div className="max-w-4xl w-full mx-auto px-6 py-8 space-y-7 animate-in fade-in duration-200">
-      {/* Top Alert Banner for Attention (Amber) */}
-      <div className="bg-[#fef5ea] border-2 border-[#fae3cd] rounded-2xl p-4 text-[#8a5314] flex items-start gap-3 shadow-sm">
-        <div className="w-5 h-5 rounded-full bg-[#d97706] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-          !
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-3.5 animate-in fade-in duration-200">
+      {/* Compact Top Attention Header with Integrated Outcome Chips */}
+      <div className="bg-[#fff4da] border-2 border-[#18181b] rounded-xl p-3.5 text-[#18181b] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[3px_3px_0px_#18181b]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-[#d31611] text-white flex items-center justify-center font-black text-xs shrink-0 border border-[#18181b]">
+            !
+          </div>
+          <div>
+            <h1 className="text-sm sm:text-base font-extrabold text-[#18181b] tracking-tight font-geist flex items-center gap-2">
+              <span>Human Approval Required</span>
+              <span className="badge-accent text-[10px]">Risk Score: 0.85 (High)</span>
+            </h1>
+            <p className="text-[11px] text-[#666666] font-medium">
+              LangGraph checkpointer paused before PR. Changes touch core session authentication logic.
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-sm font-bold text-[#8a5314]">
-            Human Approval Gate · Risk Score 0.85 (High)
-          </h2>
-          <p className="text-xs text-[#7d5019] mt-0.5 leading-relaxed">
-            LangGraph checkpointer paused execution before committing. Changes modify core session authentication logic.
-          </p>
+
+        {/* 4 Outcome Metrics Inline Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="px-2 py-1 rounded-md bg-white border border-[#18181b] text-[11px] font-bold text-[#18181b]">
+            ✓ 26/26 Tests
+          </span>
+          <span className="px-2 py-1 rounded-md bg-white border border-[#18181b] text-[11px] font-bold text-[#18181b]">
+            +1.8% Cov
+          </span>
+          <span className="px-2 py-1 rounded-md bg-white border border-[#18181b] text-[11px] font-bold text-[#18181b]">
+            0 CVEs SAST
+          </span>
+          <span className="badge-warm text-[11px] font-mono">priya/shop-api #60</span>
         </div>
       </div>
 
       {submittedStatus && (
-        <div className="p-4 bg-[#f0f9f4] border border-[#cbe4d7] rounded-xl text-xs font-semibold text-[#18533e]">
+        <div className="p-3 bg-[#ebdbb7] border-2 border-[#18181b] rounded-lg text-xs font-bold text-[#18181b] shadow-[2px_2px_0px_#18181b]">
           {submittedStatus}
         </div>
       )}
 
-      {/* 1. Issue Information */}
-      <section className="bg-white border border-[#e8e6df] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-2">
-        <div className="flex items-center justify-between text-xs text-[#8c8980]">
-          <span>Target Issue</span>
-          <span className="font-mono">priya/shop-api #60</span>
-        </div>
-        <h3 className="text-base font-semibold text-[#1a1918]">
-          Login tokens never expire
-        </h3>
-        <p className="text-xs text-[#6e6a62] leading-relaxed">
-          Reported by engineering: Authentication session tokens remain valid indefinitely after initial login. The system fails to validate UTC expiration timestamps during request verification.
-        </p>
-      </section>
-
-      {/* 2. Research Plan Summary */}
-      <section className="bg-white border border-[#e8e6df] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-2">
-        <div className="text-xs font-semibold text-[#1a1918]">Agent Resolution Plan</div>
-        <p className="text-xs text-[#6e6a62] leading-relaxed">
-          1. Trace authentication lifecycle in <code className="bg-[#f2f0ea] px-1 py-0.5 rounded text-[11px] font-mono">src/auth/session.py</code>.<br />
-          2. Inject strict UTC expiration verification and raise <code className="bg-[#f2f0ea] px-1 py-0.5 rounded text-[11px] font-mono">AuthenticationError</code> when expired.<br />
-          3. Author regression tests in <code className="bg-[#f2f0ea] px-1 py-0.5 rounded text-[11px] font-mono">tests/test_auth.py</code> covering expired and valid tokens.
-        </p>
-      </section>
-
-      {/* 3. Four Result Tiles */}
-      <section aria-label="Verification Outcomes" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Tile 1: Tests */}
-        <div className="bg-white border border-[#e8e6df] rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-1">
-          <span className="text-[11px] text-[#8c8980] uppercase tracking-wider font-semibold">1. Tests</span>
-          <div className="text-sm font-bold text-[#1b6348]">26 / 26 passed</div>
-          <p className="text-[11px] text-[#6e6a62]">2 new regression tests</p>
-        </div>
-
-        {/* Tile 2: Coverage */}
-        <div className="bg-white border border-[#e8e6df] rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-1">
-          <span className="text-[11px] text-[#8c8980] uppercase tracking-wider font-semibold">2. Coverage</span>
-          <div className="text-sm font-bold text-[#1b6348]">+1.8% delta</div>
-          <p className="text-[11px] text-[#6e6a62]">Auth path 100% covered</p>
-        </div>
-
-        {/* Tile 3: Security Scan */}
-        <div className="bg-white border border-[#e8e6df] rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-1">
-          <span className="text-[11px] text-[#8c8980] uppercase tracking-wider font-semibold">3. Scan</span>
-          <div className="text-sm font-bold text-[#1b6348]">0 vulnerabilities</div>
-          <p className="text-[11px] text-[#6e6a62]">Clean bandit/SAST pass</p>
-        </div>
-
-        {/* Tile 4: Risk */}
-        <div className="bg-white border-2 border-[#d97706] rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-1 bg-[#fefdfb]">
-          <span className="text-[11px] text-[#8a5314] uppercase tracking-wider font-semibold">4. Risk</span>
-          <div className="text-sm font-bold text-[#b45309]">0.85 High</div>
-          <p className="text-[11px] text-[#8a5314]">Touches core auth/jwt</p>
-        </div>
-      </section>
-
-      {/* 4. The Candidate Patch Diff */}
-      <section className="bg-white border border-[#e8e6df] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-2">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-[#1a1918]">Candidate Patch Diff</span>
-          <span className="font-mono text-[11px] text-[#8c8980]">src/auth/session.py</span>
-        </div>
-
-        <div className="bg-[#18191c] rounded-xl p-4 font-mono text-xs overflow-x-auto text-slate-300 select-text leading-relaxed">
-          <div className="text-[#60a5fa]">--- a/src/auth/session.py</div>
-          <div className="text-[#60a5fa]">+++ b/src/auth/session.py</div>
-          <div className="text-slate-500">@@ -39,6 +39,10 @@ def verify_login_token(token: str) -&gt; UserSession:</div>
-          <div className="text-slate-400">     session = get_session_context()</div>
-          <div className="text-[#4ade80] bg-[#4ade80]/10 px-1 rounded">
-            +    now_utc = datetime.now(timezone.utc)
-          </div>
-          <div className="text-[#4ade80] bg-[#4ade80]/10 px-1 rounded">
-            +    if not token or token.expires_at &lt; now_utc:
-          </div>
-          <div className="text-[#4ade80] bg-[#4ade80]/10 px-1 rounded">
-            +        raise AuthenticationError("Login token has expired. Please re-authenticate.")
-          </div>
-          <div className="text-[#4ade80] bg-[#4ade80]/10 px-1 rounded">
-            +    session.last_active_at = now_utc
-          </div>
-          <div className="text-slate-400">     return decode_jwt(token)</div>
-        </div>
-      </section>
-
-      {/* 5. The Approval Card (Approve, Edit, Reject with required feedback) */}
-      <section className="bg-white border-2 border-[#18533e] rounded-2xl p-6 shadow-md space-y-5">
-        <div>
-          <h2 className="text-sm font-bold text-[#1a1918]">
-            Engineer Sign-Off Decision
-          </h2>
-          <p className="text-xs text-[#706c64] mt-0.5">
-            Approve to publish the GitHub Pull Request, request revision feedback, or reject with a required reason.
-          </p>
-        </div>
-
-        {errorMessage && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Dynamic form for Edit or Reject */}
-        {actionType !== 'idle' && (
-          <form
-            onSubmit={actionType === 'edit' ? handleSubmitEdit : handleSubmitReject}
-            className="p-4 bg-[#faf9f5] border border-[#e5e2db] rounded-xl space-y-3 animate-in fade-in"
-          >
-            <label htmlFor="gate-feedback-input" className="block text-xs font-semibold text-[#1a1918]">
-              {actionType === 'edit'
-                ? 'Enter requested changes for the agent:'
-                : 'Rejection reason (Required):'}
-            </label>
-            <textarea
-              id="gate-feedback-input"
-              required
-              rows={3}
-              value={feedback}
-              onChange={(e) => {
-                setFeedback(e.target.value)
-                setErrorMessage(null)
-              }}
-              placeholder={
-                actionType === 'edit'
-                  ? 'E.g., Also update token refresh endpoint to issue new expiry timestamps.'
-                  : 'Explain why this patch is unacceptable (required)...'
-              }
-              className="w-full bg-white border border-[#dcd8ce] rounded-lg p-2.5 text-xs text-[#1a1918] focus:outline-none focus:border-[#18533e]"
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActionType('idle')
-                  setErrorMessage(null)
-                }}
-                className="min-h-[44px] px-4 rounded-lg text-xs font-medium text-[#6e6a62] hover:bg-[#eae7df]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className={`min-h-[44px] px-5 rounded-lg text-xs font-semibold text-white shadow-xs transition ${
-                  actionType === 'edit'
-                    ? 'bg-[#d97706] hover:bg-[#b45309]'
-                    : 'bg-rose-700 hover:bg-rose-800'
-                }`}
-              >
-                {actionType === 'edit' ? 'Send revision request' : 'Confirm rejection'}
-              </button>
+      {/* Main 2-Column Horizontal Split Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+        {/* LEFT COLUMN: Candidate Patch Diff & Context (7 cols) */}
+        <section className="lg:col-span-7 card-canvas-elevated p-4 flex flex-col h-[520px]">
+          <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-[#18181b] font-geist">
+                Candidate Patch Diff
+              </span>
+              <span className="font-mono text-[11px] font-bold text-[#18181b] bg-[#fff4da] px-1.5 py-0.5 rounded border border-[#18181b]">
+                src/auth/session.py
+              </span>
             </div>
-          </form>
-        )}
-
-        {/* Main Action Buttons (Min 44px height for accessibility) */}
-        {actionType === 'idle' && (
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-[#f2f0ea]">
-            <button
-              type="button"
-              onClick={() => setActionType('reject')}
-              className="min-h-[44px] px-5 py-2.5 rounded-lg text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition cursor-pointer"
-            >
-              Reject (feedback required)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActionType('edit')}
-              className="min-h-[44px] px-5 py-2.5 rounded-lg text-xs font-medium text-[#8a5314] bg-[#fef5ea] hover:bg-[#fde9d2] border border-[#fae3cd] transition cursor-pointer"
-            >
-              Edit / Request changes
-            </button>
-
-            <button
-              type="button"
-              onClick={handleApprove}
-              className="min-h-[44px] px-6 py-2.5 rounded-lg text-xs font-bold text-white bg-[#18533e] hover:bg-[#134433] shadow-sm transition cursor-pointer"
-            >
-              Approve &amp; open PR
-            </button>
+            <span className="text-[11px] text-[#666666] font-medium truncate max-w-[220px]">
+              #60 Login tokens never expire
+            </span>
           </div>
-        )}
-      </section>
+
+          {/* Compact Resolution Plan Bar */}
+          <div className="py-2 text-[11px] text-[#666666] border-b border-[#e5e5e5] bg-[#fffdf8] px-2 rounded mt-1 flex items-center justify-between">
+            <span className="font-medium">
+              <strong className="text-[#18181b]">Fix:</strong> Enforces UTC expiration validation &amp; adds regression test.
+            </span>
+            <span className="text-[#4ade80] font-bold font-mono">+4 lines / 0 errors</span>
+          </div>
+
+          {/* Unified Diff View */}
+          <div className="flex-1 mt-2 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 select-text leading-relaxed border-2 border-[#18181b]">
+            <div className="text-[#60a5fa] text-[11px]">--- a/src/auth/session.py</div>
+            <div className="text-[#60a5fa] text-[11px]">+++ b/src/auth/session.py</div>
+            <div className="text-slate-500 text-[11px]">@@ -39,6 +39,10 @@ def verify_login_token(token: str) -&gt; UserSession:</div>
+            <div className="text-slate-400">     session = get_session_context()</div>
+            <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+              +    now_utc = datetime.now(timezone.utc)
+            </div>
+            <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+              +    if not token or token.expires_at &lt; now_utc:
+            </div>
+            <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+              +        raise AuthenticationError("Login token has expired. Please re-authenticate.")
+            </div>
+            <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+              +    session.last_active_at = now_utc
+            </div>
+            <div className="text-slate-400">     return decode_jwt(token)</div>
+            <div className="pt-3 text-slate-500 text-[11px] border-t border-slate-800">
+              # Verified in Firecracker MicroVM: pytest passed, zero regressions.
+            </div>
+          </div>
+        </section>
+
+        {/* RIGHT COLUMN: Sign-Off Decision & Revision Panel (5 cols) */}
+        <section className="lg:col-span-5 card-canvas-elevated p-4 flex flex-col h-[520px]">
+          <div className="border-b-2 border-[#18181b] pb-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#d31611]">
+                Human Decision
+              </span>
+              <span className="badge-warm text-[10px]">Gate Active</span>
+            </div>
+            <h2 className="text-base font-extrabold text-[#18181b] font-geist mt-0.5">
+              Engineer Sign-Off Gate
+            </h2>
+            <p className="text-xs text-[#666666] mt-0.5 font-medium">
+              Verify patch and authorize Pull Request creation.
+            </p>
+          </div>
+
+          {errorMessage && (
+            <div className="p-2.5 bg-[#fff4da] border-2 border-[#d31611] rounded-md text-xs text-[#d31611] font-bold my-2">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Dynamic Revision Form or Action Buttons */}
+          <div className="flex-1 flex flex-col justify-between py-2">
+            {actionType !== 'idle' ? (
+              <form
+                onSubmit={actionType === 'edit' ? handleSubmitEdit : handleSubmitReject}
+                className="p-3 bg-[#fffdf8] border-2 border-[#18181b] rounded-lg space-y-2.5 shadow-[2px_2px_0px_#18181b] flex-1 flex flex-col"
+              >
+                <label htmlFor="gate-feedback-input" className="block text-xs font-bold text-[#18181b]">
+                  {actionType === 'edit'
+                    ? 'Enter requested changes for the agent:'
+                    : 'Rejection reason (Required):'}
+                </label>
+                <textarea
+                  id="gate-feedback-input"
+                  required
+                  rows={3}
+                  value={feedback}
+                  onChange={(e) => {
+                    setFeedback(e.target.value)
+                    setErrorMessage(null)
+                  }}
+                  placeholder={
+                    actionType === 'edit'
+                      ? 'E.g., Also update token refresh endpoint to issue new expiry timestamps.'
+                      : 'Explain why this patch is unacceptable...'
+                  }
+                  className="w-full flex-1 bg-white border-2 border-[#18181b] rounded-md p-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
+                />
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionType('idle')
+                      setErrorMessage(null)
+                    }}
+                    className="btn-outline-dark text-xs py-1 px-2.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-cta text-xs py-1 px-3"
+                  >
+                    {actionType === 'edit' ? 'Send revision' : 'Confirm reject'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-2.5 my-auto">
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  className="w-full btn-cta py-3 text-sm text-center block font-extrabold"
+                >
+                  Approve &amp; Open GitHub PR &rarr;
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActionType('edit')}
+                    className="btn-warm text-xs py-2 text-center"
+                  >
+                    Request Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActionType('reject')}
+                    className="btn-outline-dark text-xs py-2 text-[#d31611] text-center"
+                  >
+                    Reject Run
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Risk factors list */}
+            <div className="pt-2.5 border-t border-[#e5e5e5] space-y-1.5 text-xs">
+              <span className="text-[10px] font-bold text-[#18181b] uppercase tracking-wider block">
+                Risk Review Factors:
+              </span>
+              <ul className="text-[11px] text-[#666666] space-y-1 list-disc list-inside">
+                <li>Modifies sensitive security authentication module (<code className="text-[#18181b]">auth/session.py</code>)</li>
+                <li>Diff size: +4 lines, 0 deletions across 1 file</li>
+                <li>Regression suite verified: 26/26 tests passed in microVM</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
-
