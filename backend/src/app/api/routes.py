@@ -34,6 +34,7 @@ async def create_run(request: CreateRunRequest) -> CreateRunResponse:
             repo=request.repo,
             issue_title=request.issue_title or "",
             issue_description=request.issue_description or "",
+            github_token=request.github_token,
         )
         return CreateRunResponse(
             thread_id=thread_id,

@@ -5,9 +5,11 @@ import type {
   RunStateResponse,
   ScreenId,
   StreamEventPayload,
+  TerminologyMode,
 } from './types'
 import { createRun, getRunState, resumeRun, subscribeToRunEvents } from './services/api'
-import { Header } from './components/Header'
+import { TopAppBar } from './components/TopAppBar'
+import { LeftNavRail } from './components/LeftNavRail'
 import { ExecutionGraph } from './components/ExecutionGraph'
 import { SetupScreen } from './components/screens/SetupScreen'
 import { LiveSandboxScreen } from './components/screens/LiveSandboxScreen'
@@ -16,6 +18,8 @@ import { ApprovalGateScreen } from './components/screens/ApprovalGateScreen'
 import { ClarificationScreen } from './components/screens/ClarificationScreen'
 import { BlockedScreen } from './components/screens/BlockedScreen'
 import { FinishedScreen } from './components/screens/FinishedScreen'
+import { PoliciesScreen } from './components/screens/PoliciesScreen'
+import { AuditScreen } from './components/screens/AuditScreen'
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('setup')
@@ -37,6 +41,7 @@ export default function App() {
   const [currentAttempt, setCurrentAttempt] = useState<number>(2)
   const [showWorkflowGraph, setShowWorkflowGraph] = useState<boolean>(false)
   const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNodeId | null>(null)
+  const terminologyMode: TerminologyMode = 'plain' // Permanently Plain mode
 
   // Timer for running badge
   useEffect(() => {
@@ -234,152 +239,182 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fffdf8] text-[#18181b] flex flex-col font-sans selection:bg-[#fff4da] selection:text-[#d31611]">
-      {/* Top Header matching GitReverse Design System */}
-      <Header
+      {/* 1. Sleek Top Application Bar */}
+      <TopAppBar
         currentScreen={currentScreen}
-        onSelectScreen={(screen) => setCurrentScreen(screen)}
-        onNavigateHome={() => {
-          setCurrentScreen('setup')
+        onSelectScreen={(screen) => {
+          setCurrentScreen(screen)
           setErrorMessage(null)
         }}
-        repo={activeRepo}
-        issueTitle={activeIssueTitle}
-        issueNumber={activeIssueNumber}
-        elapsedSeconds={elapsedSeconds}
-        showWorkflowGraph={showWorkflowGraph}
-        onToggleWorkflowGraph={() => setShowWorkflowGraph((prev) => !prev)}
       />
 
-      {/* LangGraph Multi-Agent Stepper (Toggled from Header) */}
-      {showWorkflowGraph && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
-          <ExecutionGraph
-            currentNode={
-              runState?.values?.current_node ||
-              (runState?.status === 'paused_hitl'
-                ? 'hitl'
-                : currentScreen === 'live-sandbox'
-                ? 'verify'
-                : currentScreen === 'approval-gate'
-                ? 'hitl'
-                : currentScreen === 'finished'
-                ? 'pr_agent'
-                : currentScreen === 'blocked'
-                ? 'guardrail'
-                : null)
-            }
-            completedNodes={
-              (runState?.values?.completed_nodes as string[]) ||
-              (currentScreen === 'live-sandbox'
-                ? ['guardrail', 'supervisor', 'research', 'fix_test']
-                : currentScreen === 'approval-gate'
-                ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer']
-                : currentScreen === 'finished'
-                ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer', 'hitl', 'pr_agent']
-                : currentScreen === 'clarification'
-                ? ['guardrail', 'supervisor']
-                : currentScreen === 'blocked'
-                ? []
-                : [])
-            }
-            status={
-              runState?.status ||
-              (currentScreen === 'approval-gate'
-                ? 'paused_hitl'
-                : currentScreen === 'finished'
-                ? 'completed'
-                : currentScreen === 'blocked'
-                ? 'rejected'
-                : currentScreen === 'clarification'
-                ? 'waiting'
-                : currentScreen === 'setup'
-                ? 'idle'
-                : 'running')
-            }
-            selectedNode={selectedGraphNode}
-            onSelectNode={setSelectedGraphNode}
-          />
-        </section>
-      )}
+      {/* 2. Workspace Body: Left Navigation Rail + Right Main Canvas */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Navigation Rail (Contains Navigation & Workflow Graph Toggle) */}
+        <LeftNavRail
+          currentScreen={currentScreen}
+          onSelectScreen={(screen) => {
+            setCurrentScreen(screen)
+            setErrorMessage(null)
+          }}
+          activeRunsCount={2}
+          pendingSignOffCount={1}
+          showWorkflowGraph={showWorkflowGraph}
+          onToggleWorkflowGraph={() => setShowWorkflowGraph((prev) => !prev)}
+        />
 
-      {/* 3. Error Banner with GitReverse Accent & Borders */}
-      {errorMessage && (
-        <aside
-          role="alert"
-          aria-label="System notification"
-          className="max-w-3xl mx-auto mt-4 px-4 w-full"
-        >
-          <div className="p-4 bg-[#fff4da] border-2 border-[#18181b] rounded-xl text-xs text-[#18181b] flex items-start justify-between gap-3 shadow-[2px_2px_0px_#18181b]">
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-md bg-[#d31611] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-[#18181b]">
-                !
-              </span>
-              <div>
-                <p className="font-bold text-[#18181b]">Canvas Preview Notice</p>
-                <p className="mt-1 leading-relaxed text-[#666666]">{errorMessage}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-[#18181b] hover:text-[#d31611] font-bold px-2 py-1 rounded min-h-[36px] cursor-pointer"
-              aria-label="Dismiss error notice"
+        {/* Right Main Canvas Content */}
+        <main className="flex-1 overflow-y-auto bg-[#fffdf8] pb-12">
+          {/* LangGraph Multi-Agent Stepper (Toggled on Demand) */}
+          {showWorkflowGraph && (
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
+              <ExecutionGraph
+                currentNode={
+                  runState?.values?.current_node ||
+                  (runState?.status === 'paused_hitl'
+                    ? 'hitl'
+                    : currentScreen === 'live-sandbox'
+                    ? 'verify'
+                    : currentScreen === 'approval-gate'
+                    ? 'hitl'
+                    : currentScreen === 'finished'
+                    ? 'pr_agent'
+                    : currentScreen === 'blocked'
+                    ? 'guardrail'
+                    : null)
+                }
+                completedNodes={
+                  (runState?.values?.completed_nodes as string[]) ||
+                  (currentScreen === 'live-sandbox'
+                    ? ['guardrail', 'supervisor', 'research', 'fix_test']
+                    : currentScreen === 'approval-gate'
+                    ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer']
+                    : currentScreen === 'finished'
+                    ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer', 'hitl', 'pr_agent']
+                    : currentScreen === 'clarification'
+                    ? ['guardrail', 'supervisor']
+                    : currentScreen === 'blocked'
+                    ? []
+                    : [])
+                }
+                status={
+                  runState?.status ||
+                  (currentScreen === 'approval-gate'
+                    ? 'paused_hitl'
+                    : currentScreen === 'finished'
+                    ? 'completed'
+                    : currentScreen === 'blocked'
+                    ? 'rejected'
+                    : currentScreen === 'clarification'
+                    ? 'waiting'
+                    : currentScreen === 'setup'
+                    ? 'idle'
+                    : 'running')
+                }
+                selectedNode={selectedGraphNode}
+                onSelectNode={setSelectedGraphNode}
+              />
+            </section>
+          )}
+
+          {/* Error Banner */}
+          {errorMessage && (
+            <aside
+              role="alert"
+              aria-label="System notification"
+              className="max-w-3xl mx-auto mt-4 px-4 w-full"
             >
-              ✕
-            </button>
-          </div>
-        </aside>
-      )}
+              <div className="p-4 bg-[#fff4da] border-2 border-[#18181b] rounded-xl text-xs text-[#18181b] flex items-start justify-between gap-3 shadow-[2px_2px_0px_#18181b]">
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-md bg-[#d31611] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-[#18181b]">
+                    !
+                  </span>
+                  <div>
+                    <p className="font-bold text-[#18181b]">Canvas Preview Notice</p>
+                    <p className="mt-1 leading-relaxed text-[#666666]">{errorMessage}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setErrorMessage(null)}
+                  className="text-[#18181b] hover:text-[#d31611] font-bold px-2 py-1 rounded min-h-[36px] cursor-pointer"
+                  aria-label="Dismiss error notice"
+                >
+                  ✕
+                </button>
+              </div>
+            </aside>
+          )}
 
-      {/* 4. Active Screen Rendered on Canvas */}
-      <main className="flex-1 pb-4">
-        {currentScreen === 'setup' && (
-          <SetupScreen onStartRun={handleStartRun} loading={loading} />
-        )}
+          {/* Active Screen Rendered on Main Canvas */}
+          {currentScreen === 'setup' && (
+            <SetupScreen
+              onStartRun={handleStartRun}
+              loading={loading}
+              terminologyMode={terminologyMode}
+            />
+          )}
 
-        {currentScreen === 'live-sandbox' && (
-          <LiveSandboxScreen
-            sandboxId={sandboxId}
-            currentAttempt={currentAttempt}
-            maxAttempts={3}
-            events={events}
-          />
-        )}
+          {currentScreen === 'live-sandbox' && (
+            <LiveSandboxScreen
+              sandboxId={sandboxId}
+              currentAttempt={currentAttempt}
+              maxAttempts={3}
+              events={events}
+              terminologyMode={terminologyMode}
+              repo={activeRepo}
+              issueTitle={activeIssueTitle}
+              elapsedSeconds={elapsedSeconds}
+            />
+          )}
 
-        {currentScreen === 'every-stage' && <EveryStageScreen />}
+          {currentScreen === 'approval-gate' && (
+            <ApprovalGateScreen
+              onApprove={handleApprove}
+              onRequestChanges={handleRequestChanges}
+              onReject={handleReject}
+              terminologyMode={terminologyMode}
+              repo={activeRepo}
+              issueTitle={activeIssueTitle}
+            />
+          )}
 
-        {currentScreen === 'approval-gate' && (
-          <ApprovalGateScreen
-            onApprove={handleApprove}
-            onRequestChanges={handleRequestChanges}
-            onReject={handleReject}
-          />
-        )}
+          {currentScreen === 'every-stage' && <EveryStageScreen />}
 
-        {currentScreen === 'clarification' && (
-          <ClarificationScreen
-            onSubmitClarification={(_choice, _notes) => {
-              setCurrentScreen('live-sandbox')
-            }}
-          />
-        )}
+          {currentScreen === 'clarification' && (
+            <ClarificationScreen
+              onSubmitClarification={(_choice, _notes) => {
+                setCurrentScreen('live-sandbox')
+              }}
+            />
+          )}
 
-        {currentScreen === 'blocked' && (
-          <BlockedScreen
-            onRetryWithRepo={(repo) => {
-              setActiveRepo(repo)
-              setCurrentScreen('setup')
-            }}
-          />
-        )}
+          {currentScreen === 'blocked' && (
+            <BlockedScreen
+              onRetryWithRepo={(repo) => {
+                setActiveRepo(repo)
+                setCurrentScreen('setup')
+              }}
+            />
+          )}
 
-        {currentScreen === 'finished' && (
-          <FinishedScreen
-            prUrl={runState?.pr_url || 'https://github.com/priya/shop-api/pull/42'}
-            repo={activeRepo}
-            onStartNewRun={() => setCurrentScreen('setup')}
-          />
-        )}
-      </main>
+          {currentScreen === 'finished' && (
+            <FinishedScreen
+              prUrl={runState?.pr_url || `https://github.com/${activeRepo}/pull/61`}
+              repo={activeRepo}
+              prNumber={activeIssueNumber}
+              onStartNewRun={() => setCurrentScreen('setup')}
+            />
+          )}
+
+          {currentScreen === 'policies' && (
+            <PoliciesScreen terminologyMode={terminologyMode} />
+          )}
+
+          {currentScreen === 'audit' && (
+            <AuditScreen terminologyMode={terminologyMode} />
+          )}
+        </main>
+      </div>
     </div>
   )
 }

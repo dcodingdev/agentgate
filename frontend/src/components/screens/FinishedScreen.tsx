@@ -137,7 +137,7 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
           <div>
             <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
               <span className="text-xs font-extrabold text-[#18181b] font-geist">
-                Multi-Agent Pipeline Audit
+                Execution Audit &amp; Cleanup
               </span>
               <span className="text-[10px] font-bold text-[#666666]">
                 Total: 72s
@@ -148,23 +148,15 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
               <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="font-bold text-[#18181b]">1. Guardrail</span>
+                  <span className="font-bold text-[#18181b]">Background Operations (Logged)</span>
                 </div>
-                <span className="text-[11px] text-[#666666]">Passed (0.8s)</span>
+                <span className="text-[11px] text-[#666666]">Guardrail &amp; Supervisor (4.2s)</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="font-bold text-[#18181b]">2. Supervisor &amp; Research</span>
-                </div>
-                <span className="text-[11px] text-[#666666]">Fan-out complete (4.2s)</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="font-bold text-[#18181b]">3. Sandbox &amp; Verification</span>
+                  <span className="font-bold text-[#18181b]">Sandbox &amp; Verification</span>
                 </div>
                 <span className="text-[11px] text-[#666666]">Attempt 2 passed (31.4s)</span>
               </div>
@@ -172,7 +164,7 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
               <div className="flex items-center justify-between p-2 rounded bg-white border border-[#e5e5e5]">
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-[#18181b] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="font-bold text-[#18181b]">4. HITL Approval Sign-Off</span>
+                  <span className="font-bold text-[#18181b]">HITL Approval Sign-Off</span>
                 </div>
                 <span className="text-[11px] text-[#666666]">Approved by engineer (18.2s)</span>
               </div>
@@ -180,7 +172,7 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
               <div className="flex items-center justify-between p-2 rounded bg-[#fff4da] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b]">
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-[#d31611] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                  <span className="font-bold text-[#18181b]">5. PR Published</span>
+                  <span className="font-bold text-[#18181b]">PR Published</span>
                 </div>
                 <span className="text-[11px] font-bold text-[#d31611]">PR #{displayPrNumber}</span>
               </div>
@@ -189,8 +181,8 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
 
           <div className="pt-3 border-t border-[#e5e5e5] space-y-2">
             <div className="p-2.5 rounded bg-[#fffdf8] border border-[#18181b] text-[11px] flex items-center justify-between">
-              <span className="font-medium text-[#18181b]">Firecracker MicroVM</span>
-              <span className="text-[#4ade80] font-bold font-mono">Cleaned up &amp; terminated</span>
+              <span className="font-medium text-[#18181b]">Isolated Sandbox</span>
+              <span className="text-[#0d9488] font-bold font-mono">Cleaned up &amp; purged</span>
             </div>
 
             {onStartNewRun && (

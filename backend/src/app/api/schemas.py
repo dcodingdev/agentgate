@@ -11,6 +11,11 @@ class CreateRunRequest(BaseModel):
     repo: str = Field(..., description="Repository in owner/repo format", examples=["org/repo"])
     issue_title: Optional[str] = Field(default="", description="Optional issue title")
     issue_description: Optional[str] = Field(default="", description="Optional issue description or reproduction instructions")
+    retry_cap: Optional[int] = Field(default=3, description="Safe Lab maximum test loop retries")
+    policy_threshold: Optional[float] = Field(default=0.70, description="Risk gate emergency threshold ceiling")
+    auto_open_pr: Optional[bool] = Field(default=False, description="Whether to auto-publish PR without HITL gate")
+    team_lead_guidance: Optional[str] = Field(default=None, description="Optional prompt injection for supervisor")
+    github_token: Optional[str] = Field(default=None, description="Individual user's GitHub Personal Access Token")
 
 
 class CreateRunResponse(BaseModel):

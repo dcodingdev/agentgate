@@ -59,7 +59,7 @@ const NODES_PIPELINE: GraphNodeMeta[] = [
   {
     id: 'pr_agent',
     title: '8. PR Agent',
-    role: 'Pull Request Publisher',
+    role: 'Pull Request Publishing',
     description: 'Pushes fix branch to GitHub repository and opens verified Pull Request.',
   },
 ]

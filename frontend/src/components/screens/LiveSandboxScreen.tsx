@@ -1,156 +1,291 @@
 import React, { useState } from 'react'
-import type { StageStatus, StreamEventPayload } from '../../types'
+import {
+  Clock,
+  Coins,
+  Cpu,
+  FileCode2,
+  Terminal,
+} from 'lucide-react'
+import type {
+  StageDefinition,
+  StageStatus,
+  StreamEventPayload,
+  TerminologyMode,
+} from '../../types'
+import { STAGES_CATALOG, formatStageLabel } from '../../utils/terminology'
 
 interface LiveSandboxScreenProps {
   sandboxId?: string
   currentAttempt?: number
   maxAttempts?: number
   events?: StreamEventPayload[]
+  terminologyMode?: TerminologyMode
+  repo?: string
+  issueTitle?: string
+  elapsedSeconds?: number
 }
 
-interface PipelineStep {
-  name: string
-  status: StageStatus
-  meta: string
+interface LogEntry {
+  node: string
+  message: string
+  time: string
+  isLatest?: boolean
+}
+
+const NODE_ACTION_MAP: Record<string, string> = {
+  guardrail: 'Security Check',
+  supervisor: 'Planning',
+  issue_analysis: 'Issue Analysis',
+  code_search: 'Code Search',
+  docs_lookup: 'Docs Lookup',
+  research: 'Code Research',
+  aggregate_research: 'Code Research',
+  fix_test: 'Patch & Test',
+  sandbox: 'Patch & Test',
+  verify: 'Verification',
+  reviewer: 'Risk Review',
+  hitl: 'Human Sign-Off',
+  pr_agent: 'Publish PR',
+}
+
+const getActionLabel = (node: string): string => {
+  return NODE_ACTION_MAP[node] || node.replace(/_/g, ' ')
 }
 
 export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
-  sandboxId = 'sbx_8f21',
+  sandboxId = 'sbx-8931a',
   currentAttempt = 2,
   maxAttempts = 3,
   events = [],
+  terminologyMode = 'both',
+  repo = 'priya/shop-api',
+  issueTitle = 'Support Ed25519 asymmetric signatures for client JWTs',
+  elapsedSeconds = 222,
 }) => {
   const [selectedAttemptTab, setSelectedAttemptTab] = useState<'attempt1' | 'attempt2'>('attempt2')
 
-  // Slim 7-step pipeline progression
-  const pipelineSteps: PipelineStep[] = [
-    { name: '1. Guardrail', status: 'Done', meta: '0.8s' },
-    { name: '2. Supervisor', status: 'Done', meta: 'Plan' },
-    { name: '3. Research', status: 'Done', meta: 'Send' },
-    { name: '4. Sandbox', status: 'Running', meta: `${currentAttempt}/${maxAttempts}` },
-    { name: '5. Verify', status: 'Waiting', meta: 'Queued' },
-    { name: '6. Reviewer', status: 'Waiting', meta: 'Risk' },
-    { name: '7. Approval', status: 'Waiting', meta: 'HITL' },
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60)
+    const rem = secs % 60
+    return `${mins}m ${rem < 10 ? '0' : ''}${rem}s`
+  }
+
+  // 8-Stage Tracker status mapping
+  const stageStates: Record<string, { status: StageStatus; meta: string }> = {
+    '01': { status: 'Done', meta: '0.8s' },
+    '02': { status: 'Done', meta: 'Plan' },
+    '03': { status: 'Done', meta: 'Send' },
+    '04': { status: 'Running', meta: `${currentAttempt}/${maxAttempts}` },
+    '05': { status: 'Waiting', meta: 'Queued' },
+    '06': { status: 'Waiting', meta: 'Risk' },
+    '07': { status: 'Waiting', meta: 'HITL' },
+    '08': { status: 'Waiting', meta: 'PR' },
+  }
+
+  // Fallback logs if no live SSE events are streamed yet
+  const defaultLogs: LogEntry[] = [
+    { node: 'guardrail', message: 'Repository verified in allowlist.', time: '20:41:02' },
+    { node: 'supervisor', message: 'Dispatched parallel research.', time: '20:41:03' },
+    { node: 'research', message: 'Issue & code analysis complete.', time: '20:41:07' },
+    { node: 'sandbox', message: 'Attempt 2 passed: 26/26 tests.', time: '20:41:15', isLatest: true },
   ]
 
+  const displayLogs: LogEntry[] = events.length > 0
+    ? events.map((ev, idx) => ({
+        node: ev.data?.node || ev.event || 'agent',
+        message: ev.data?.message || ev.data?.status || ev.event,
+        time: ev.timestamp ? ev.timestamp.slice(11, 19) : new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        isLatest: idx === events.length - 1,
+      }))
+    : defaultLogs
+
+  // Filter out stages that are already Done to keep the active pipeline uncluttered
+  const activeStages = STAGES_CATALOG.filter(
+    (stage) => stageStates[stage.step]?.status !== 'Done'
+  )
+  const completedStages = STAGES_CATALOG.filter(
+    (stage) => stageStates[stage.step]?.status === 'Done'
+  )
+
   return (
-    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-3.5 animate-in fade-in duration-200">
-      {/* Compact Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#18181b]">
+    <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
+      {/* 1. Top Header: Title, LIVE badge, and Clean Abstraction Badges */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b-2 border-[#18181b]">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] tracking-[-0.03em] font-geist leading-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] tracking-[-0.03em] font-geist">
               Live Sandbox Execution
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#d31611] text-white">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+            <span className="bg-[#d31611] text-white text-[11px] font-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#18181b]">
               LIVE
             </span>
           </div>
-          <p className="text-xs text-[#666666] mt-0.5 font-medium">
-            Real-time microVM commands, patch iterations, and event feed side-by-side.
+          <p className="text-xs text-[#666666] mt-0.5 font-medium truncate max-w-2xl">
+            Real-time test commands, patch iterations, and live event feed side-by-side · {issueTitle}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="badge-warm font-mono text-[11px]">MicroVM: {sandboxId}</span>
-          <span className="badge-warm text-[11px]">Firecracker Linux</span>
-          <span className="badge-accent text-[11px]">Network: Read-Only</span>
+        {/* Right Status Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+          <div className="px-2.5 py-1 rounded bg-white border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
+            <Cpu className="w-3.5 h-3.5 text-[#0d9488]" />
+            <span>Sandbox #{sandboxId}</span>
+          </div>
+
+          <div className="px-2.5 py-1 rounded bg-white border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b]">
+            Isolated Linux
+          </div>
+
+          <div className="px-2.5 py-1 rounded bg-[#d31611] text-white border border-[#18181b] font-bold shadow-[1px_1px_0px_#18181b]">
+            Network: Read-Only
+          </div>
+
+          <div className="px-2.5 py-1 rounded bg-[#fffdf8] border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-[#0d9488]" />
+            <span>{formatTime(elapsedSeconds)}</span>
+          </div>
+
+          <div className="px-2.5 py-1 rounded bg-[#fffdf8] border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
+            <Coins className="w-3.5 h-3.5 text-[#d97706]" />
+            <span>$0.18</span>
+          </div>
         </div>
       </div>
 
-      {/* Slim Single-Line Progression Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-        {pipelineSteps.map((step) => {
-          let style = 'border-2 border-[#e5e5e5] bg-white text-[#666666]'
-          if (step.status === 'Done') {
-            style = 'border-2 border-[#18181b] bg-[#ebdbb7] text-[#18181b] shadow-[1px_1px_0px_#18181b]'
-          } else if (step.status === 'Running') {
-            style = 'border-2 border-[#18181b] bg-[#fff4da] text-[#d31611] shadow-[2px_2px_0px_#18181b]'
-          }
-          return (
-            <div
-              key={step.name}
-              className={`px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition ${style}`}
-            >
-              <div className="flex items-center gap-1.5 truncate">
-                {step.status === 'Running' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#d31611] animate-ping shrink-0" />
-                )}
-                <span className="font-extrabold truncate">{step.name}</span>
+      {/* 2. Compact Horizontal Pipeline Bar (Active & Pending Actions Only) */}
+      <section aria-label="Workflow pipeline progression" className="w-full space-y-2">
+        {completedStages.length > 0 && (
+          <div className="flex items-center justify-between text-xs font-mono px-0.5">
+            <div className="flex items-center gap-2 text-[#666666]">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#ebdbb7] text-[#18181b] font-bold text-[11px] border border-[#18181b] shadow-[1px_1px_0px_#18181b]">
+                <span className="text-[#0d9488]">✓</span> {completedStages.length} Actions Completed
+              </span>
+              <span className="text-[11px] font-medium hidden sm:inline text-[#666666]">
+                {completedStages.map((s) => s.plain).join(' · ')}
+              </span>
+            </div>
+            <span className="text-[10px] text-[#666666] hidden md:inline">
+              Active &amp; pending pipeline
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          {activeStages.map((stage: StageDefinition) => {
+            const state = stageStates[stage.step]
+            const isRunning = state?.status === 'Running'
+            const { primary, secondary } = formatStageLabel(stage, terminologyMode)
+
+            let cardStyle = 'border-2 border-[#e5e5e5] bg-white text-[#666666]'
+            if (isRunning) {
+              cardStyle =
+                'border-2 border-[#18181b] bg-[#fffdf8] text-[#18181b] shadow-[2px_2px_0px_#d31611]'
+            }
+
+            return (
+              <div
+                key={stage.step}
+                className={`p-2.5 rounded-lg text-xs flex items-center justify-between min-h-[46px] transition ${cardStyle}`}
+              >
+                <div className="truncate mr-1">
+                  <span className="font-extrabold text-[12px] leading-tight text-[#18181b]">
+                    {stage.step.replace(/^0/, '')}. {primary}
+                  </span>
+                  {secondary && (
+                    <span className="hidden xl:inline text-[9px] font-mono text-[#666666] ml-1">
+                      ({secondary})
+                    </span>
+                  )}
+                </div>
+
+                <div className="shrink-0 text-right">
+                  {isRunning ? (
+                    <span className="font-bold text-[11px] text-[#d31611] px-1.5 py-0.5 bg-[#d31611]/10 rounded border border-[#d31611]">
+                      {state?.meta}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono font-bold opacity-75">
+                      {state?.meta}
+                    </span>
+                  )}
+                </div>
               </div>
-              <span className="text-[10px] font-bold opacity-80 shrink-0 ml-1">
-                {step.meta}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      </section>
 
-      {/* 3-Column True Horizontal Workstation Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-        {/* COLUMN 1: Live MicroVM Terminal (5 cols) */}
-        <section className="lg:col-span-5 card-canvas-elevated p-4 flex flex-col h-[520px]">
-          <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
+      {/* 3. Three Equal-Height Side-by-Side Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        {/* COLUMN 1: Test Runner [Active] */}
+        <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
+          {/* Header */}
+          <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold text-[#18181b] font-geist">
-                MicroVM Runner
-              </span>
-              <span className="badge-warm text-[10px]">Active</span>
+              <Terminal className="w-4 h-4 text-[#0d9488]" />
+              <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
+                Test Runner
+              </h2>
+              <span className="badge-teal text-[10px]">Active</span>
             </div>
 
-            <div className="flex items-center gap-1 text-[11px]">
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#ebdbb7] text-[#18181b] border border-[#18181b]">
+            {/* Attempts Pill Tabs */}
+            <div className="flex items-center gap-1 text-[10px] font-mono font-bold">
+              <span className="px-1.5 py-0.5 rounded bg-[#ebdbb7] border border-[#18181b] text-[#18181b]">
                 1/3 Done
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#d31611] text-white border border-[#18181b]">
+              <span className="px-1.5 py-0.5 rounded bg-[#d31611] text-white border border-[#18181b]">
                 2/3 Active
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white text-[#666666] border border-[#e5e5e5]">
+              <span className="px-1.5 py-0.5 rounded bg-white border border-[#e5e5e5] text-[#666666]">
                 3/3 Queued
               </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-[#666666] py-1.5 font-mono">
-            <span className="font-bold text-[#18181b]">tty0 · /repo/shop-api</span>
+          {/* Subheader */}
+          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
+            <span>tty0 · /repo/{repo}</span>
             <span>pytest v9.1.1</span>
           </div>
 
-          <div
-            tabIndex={0}
-            role="region"
-            aria-label="Live Sandbox Terminal"
-            className="flex-1 bg-[#18181b] text-slate-100 rounded-lg p-3.5 font-mono text-xs leading-relaxed overflow-y-auto shadow-inner select-text border-2 border-[#18181b] space-y-2"
-          >
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="text-[#d31611] font-bold">$</span>
-              <span className="text-slate-200">git apply patch_v2.diff &amp;&amp; pytest -q</span>
+          {/* Terminal Console */}
+          <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-2">
+            <div>
+              <span className="text-[#f87171] font-bold">$ </span>
+              <span className="text-slate-100">git apply patch_v2.diff &amp;&amp; pytest -q</span>
             </div>
             <div className="text-slate-400 text-[11px]">
               running 26 tests across 4 test suites in isolated sandbox...
             </div>
-            <div className="text-[#4ade80] flex items-center gap-2 pt-1 font-bold">
-              <span>✓ 26 passed in 3.1s</span>
-              <span className="text-slate-500 font-normal text-[11px]">
-                (24 baseline + 2 regression)
-              </span>
+            <div className="text-[#4ade80] font-bold text-xs pt-1">
+              ✓ 26 passed in 3.1s <span className="text-slate-400 font-normal">(24 baseline + 2 regression)</span>
             </div>
-            <div className="text-slate-400 text-[11px]">
-              Coverage: +1.8% lines covered in <code className="text-slate-200">src/auth/session.py</code>
+            <div className="text-teal-300 text-[11px]">
+              Coverage: +1.4% lines covered in src/auth/jwt_manager.py
             </div>
-            <div className="pt-2 border-t border-slate-800 text-slate-500 text-[11px]">
-              # MicroVM isolation verified: read-only rootfs, zero leaked credentials.
+            <div className="pt-3 border-t border-slate-800 text-[10px] text-slate-500">
+              # Sandbox isolation verified: read-only filesystem, zero leaked credentials.
             </div>
           </div>
         </section>
 
-        {/* COLUMN 2: Patch Diff Synthesis (4 cols) */}
-        <section className="lg:col-span-4 card-canvas-elevated p-4 flex flex-col h-[520px]">
-          <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
-            <span className="text-xs font-extrabold text-[#18181b] font-geist">
-              Patch Diff Synthesis
-            </span>
+        {/* COLUMN 2: Patch Diff Synthesis */}
+        <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
+          {/* Header */}
+          <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
+            <div className="flex items-center gap-2">
+              <FileCode2 className="w-4 h-4 text-[#0d9488]" />
+              <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
+                Patch Diff Synthesis
+              </h2>
+            </div>
+
+            {/* Attempt Switcher Buttons */}
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -161,7 +296,7 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
                     : 'bg-white text-[#18181b] border border-[#18181b]'
                 }`}
               >
-                Att. 1
+                Att 1
               </button>
               <button
                 type="button"
@@ -172,119 +307,99 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
                     : 'bg-white text-[#18181b] border border-[#18181b]'
                 }`}
               >
-                Att. 2 (Passed)
+                Att 2 (Passed)
               </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-[#666666] py-1.5 font-mono">
-            <span className="font-bold text-[#18181b]">src/auth/session.py</span>
-            <span className="text-[#4ade80] font-bold">+3 lines</span>
+          {/* Subheader */}
+          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
+            <span className="font-bold text-[#18181b]">src/auth/jwt_manager.py</span>
+            <span className="text-[#0d9488] font-bold">+18 lines / -4 lines</span>
           </div>
 
-          <div className="flex-1 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
+          {/* Diff Box */}
+          <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
             {selectedAttemptTab === 'attempt2' ? (
               <>
                 <div className="text-slate-500 text-[10px] pb-1">
-                  # Attempt 2: UTC parsing &amp; null guard on token.expires_at
+                  # Attempt 2: Added RFC 8037 Ed25519 signature verification
                 </div>
-                <div className="text-[#60a5fa] text-[11px]">--- a/src/auth/session.py</div>
-                <div className="text-[#60a5fa] text-[11px]">+++ b/src/auth/session.py</div>
-                <div className="text-slate-500 text-[11px]">@@ -40,6 +40,9 @@ def verify_login_token(token: str):</div>
-                <div className="text-slate-400">     session = get_session_context()</div>
+                <div className="text-[#60a5fa] text-[11px]">--- a/src/auth/jwt_manager.py</div>
+                <div className="text-[#60a5fa] text-[11px]">+++ b/src/auth/jwt_manager.py</div>
+                <div className="text-slate-500 text-[11px]">@@ -54,8 +54,14 @@ def verify_jwt_signature(token: str, key):</div>
+                <div className="text-slate-400">     header = jwt.get_unverified_header(token)</div>
                 <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +    if not token or token.is_expired():
-                </div>
-                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +        raise AuthenticationError("Token expired")
+                  +    if header.get("alg") == "EdDSA":
                 </div>
                 <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +    session.touch(datetime.now(timezone.utc))
+                  +        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
                 </div>
-                <div className="text-slate-400">     return decode_jwt(token)</div>
+                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+                  +        public_key = Ed25519PublicKey.from_public_bytes(key)
+                </div>
+                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
+                  +        return jwt.decode(token, public_key, algorithms=["EdDSA"])
+                </div>
+                <div className="text-slate-400">     # Fallback to standard RSA/ECDSA verification</div>
+                <div className="text-slate-400">     return jwt.decode(token, key, algorithms=["RS256"])</div>
               </>
             ) : (
               <>
                 <div className="text-slate-500 text-[10px] pb-1">
-                  # Attempt 1: naive check raised AttributeError
+                  # Attempt 1: naive decode threw InvalidKeyError on raw bytes
                 </div>
                 <div className="text-[#f87171] bg-[#f87171]/15 px-1 rounded font-bold">
-                  -    if token.expired: raise Error()
+                  -    return jwt.decode(token, key, algorithms=["EdDSA"])
                 </div>
                 <div className="text-slate-400 pt-2 text-[11px]">
-                  Result: AttributeError when token was None.
+                  # Result: Test suite failed with InvalidAlgorithmError.
                 </div>
               </>
             )}
           </div>
         </section>
 
-        {/* COLUMN 3: Live Event Stream Feed (3 cols) */}
-        <section className="lg:col-span-3 card-canvas-elevated p-4 flex flex-col h-[520px]">
-          <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
-            <h2 className="text-xs font-extrabold text-[#18181b] tracking-tight font-geist">
+        {/* COLUMN 3: Live Stream */}
+        <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
+          {/* Header */}
+          <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
+            <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
               Live Stream
             </h2>
-            <span className="text-[10px] text-[#666666] font-bold font-mono">
-              {events.length > 0 ? `${events.length} events` : 'SSE Feed'}
+            <span className="text-[10px] font-mono text-[#666666]">
+              Live Events
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-[#666666] py-1.5 font-mono">
-            <span>Node Activity</span>
+          {/* Subheader */}
+          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
+            <span>Action</span>
             <span>Status</span>
           </div>
 
-          <div className="flex-1 space-y-1.5 text-xs font-mono overflow-y-auto pr-1">
-            {events.length > 0 ? (
-              events.map((evt, idx) => (
-                <div
-                  key={idx}
-                  className="p-2 rounded bg-[#fffdf8] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] text-[11px] space-y-0.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#d31611] font-bold">
-                      [{evt.data?.node || evt.event}]
-                    </span>
-                    <span className="text-[#666666] font-medium text-[10px]">{evt.timestamp}</span>
-                  </div>
-                  <p className="text-[#18181b] font-medium truncate">
-                    {evt.data?.message || evt.data?.status || JSON.stringify(evt.data)}
-                  </p>
+          {/* Events Log Cards Container */}
+          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-0.5">
+            {displayLogs.map((log, idx) => (
+              <div
+                key={idx}
+                className={`p-2.5 rounded-lg border-2 border-[#18181b] transition ${
+                  log.isLatest
+                    ? 'bg-[#ebdbb7] shadow-[2px_2px_0px_#18181b]'
+                    : 'bg-white shadow-[1px_1px_0px_#18181b]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="font-black text-[#d31611]">
+                    [{getActionLabel(log.node)}]
+                  </span>
+                  <span className="text-[#666666] text-[10px]">{log.time}</span>
                 </div>
-              ))
-            ) : (
-              <>
-                <div className="p-2 rounded bg-[#fffdf8] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] text-[11px] space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#18181b] font-bold">[guardrail]</span>
-                    <span className="text-[#666666] text-[10px]">10:41:02</span>
-                  </div>
-                  <p className="text-[#18181b] truncate">Repository verified in allowlist.</p>
-                </div>
-                <div className="p-2 rounded bg-[#fffdf8] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] text-[11px] space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#18181b] font-bold">[supervisor]</span>
-                    <span className="text-[#666666] text-[10px]">10:41:03</span>
-                  </div>
-                  <p className="text-[#18181b] truncate">Dispatched parallel research.</p>
-                </div>
-                <div className="p-2 rounded bg-[#fffdf8] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] text-[11px] space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#d31611] font-bold">[research]</span>
-                    <span className="text-[#666666] text-[10px]">10:41:07</span>
-                  </div>
-                  <p className="text-[#18181b] truncate">Issue &amp; code analysis complete.</p>
-                </div>
-                <div className="p-2 rounded bg-[#fff4da] border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] text-[11px] space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#d31611] font-bold">[sandbox]</span>
-                    <span className="text-[#666666] text-[10px]">10:41:15</span>
-                  </div>
-                  <p className="text-[#18181b] font-bold truncate">Attempt 2 passed: 26/26 tests.</p>
-                </div>
-              </>
-            )}
+                <p className="text-xs font-bold text-[#18181b] mt-0.5 leading-snug">
+                  {log.message}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
       </div>

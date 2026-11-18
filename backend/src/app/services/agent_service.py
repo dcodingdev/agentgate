@@ -32,6 +32,7 @@ class AgentService:
         repo: str,
         issue_title: str = "",
         issue_description: str = "",
+        github_token: Optional[str] = None,
     ) -> str:
         """Initialize a new SWE agent run and start asynchronous graph execution."""
         clean_repo = (
@@ -43,6 +44,13 @@ class AgentService:
         )
         thread_id = f"run_{uuid.uuid4().hex[:12]}"
         logger.info("Starting run %s for repo %s and issue %s", thread_id, clean_repo, issue_url)
+
+        if github_token:
+            try:
+                from app.tools.mcp_client import get_mcp_client
+                get_mcp_client().set_active_token(github_token)
+            except Exception as e:
+                logger.warning("Could not set active user GitHub token: %s", e)
 
         # 1. Record metadata in database
         metadata = RunMetadata(

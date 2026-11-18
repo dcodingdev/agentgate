@@ -14,6 +14,17 @@ class MultiServerMCPClient:
         self.settings = get_settings()
         self.connected_servers: Dict[str, Any] = {}
         self.tools_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self.active_user_token: Optional[str] = None
+
+    def set_active_token(self, token: Optional[str]) -> None:
+        """Set an individual user-supplied GitHub Personal Access Token."""
+        if token and token.strip():
+            self.active_user_token = token.strip()
+            self.connected_servers["github"] = {
+                "status": "connected",
+                "type": "github",
+                "capabilities": ["issues", "pull_requests", "commits"],
+            }
 
     def connect_all_sync(self) -> None:
         """Initialize connections to configured MCP servers synchronously."""
@@ -71,7 +82,7 @@ class MultiServerMCPClient:
                 .removeprefix("github.com/")
                 .strip("/")
             )
-            token = self.settings.github_token
+            token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
             is_mock_repo = clean_repo in ("test/repo", "org/repo", "mock/repo") or clean_repo.startswith("test/")
 
             if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
@@ -146,7 +157,7 @@ class MultiServerMCPClient:
                 .removeprefix("github.com/")
                 .strip("/")
             )
-            token = self.settings.github_token
+            token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
 
             is_mock_repo = clean_repo in ("test/repo", "org/repo", "mock/repo") or clean_repo.startswith("test/")
             if is_mock_repo or not token or token.startswith("mock") or token.startswith("ghp_your"):
