@@ -1,41 +1,23 @@
 import React from 'react'
 import { Lock, Shield, Sliders } from 'lucide-react'
 import type { TerminologyMode } from '../../types'
-import { formatDualTerm } from '../../utils/terminology'
 
 interface PoliciesScreenProps {
   terminologyMode?: TerminologyMode
 }
 
-export const PoliciesScreen: React.FC<PoliciesScreenProps> = ({
-  terminologyMode = 'both',
-}) => {
-  const { primary: secGateTitle, secondary: secGateTech } = formatDualTerm(
-    'Security Gate',
-    'guardrail',
-    terminologyMode
-  )
-
+export const PoliciesScreen: React.FC<PoliciesScreenProps> = () => {
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#18181b]">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] tracking-[-0.03em] font-geist">
-              Repositories &amp; Governance Policies
-            </h1>
-            <span className="badge-teal">Enforced by Code</span>
-          </div>
-          <p className="text-xs text-[#666666] mt-0.5 font-medium">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] font-geist">
+            Repositories &amp; Governance Policies
+          </h1>
+          <p className="text-sm text-[#555555] mt-0.5 font-medium">
             Organizational guardrails, retry limits, sensitive path definitions, and approval ceilings.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <span className="badge-warm">
-            {secGateTitle} ({secGateTech})
-          </span>
         </div>
       </div>
 
@@ -158,11 +140,6 @@ export const PoliciesScreen: React.FC<PoliciesScreenProps> = ({
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="p-2.5 rounded bg-[#fff4da] border border-[#18181b] text-[11px] text-[#18181b] flex items-center justify-between">
-            <span className="font-medium">Governance Policy Version:</span>
-            <span className="font-mono font-bold">v2.4-enterprise-strict</span>
           </div>
         </section>
       </div>

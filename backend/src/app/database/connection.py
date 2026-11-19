@@ -39,7 +39,18 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
         return _pool, _checkpointer
 
     try:
-        logger.info("Connecting to PostgreSQL at %s", settings.database_url)
+        import asyncio
+        import psycopg
+
+        logger.info("Probing PostgreSQL at %s", settings.database_url)
+        # Fast probe with short timeout to prevent AsyncConnectionPool retry loops on auth failure
+        async with await asyncio.wait_for(
+            psycopg.AsyncConnection.connect(settings.database_url, connect_timeout=2),
+            timeout=2.0,
+        ) as probe_conn:
+            pass
+
+        logger.info("PostgreSQL probe successful. Initializing pool...")
         _pool = AsyncConnectionPool(
             conninfo=settings.database_url,
             min_size=2,
@@ -74,6 +85,12 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
             "PostgreSQL connection failed (%s). Running with MemorySaver and in-memory store for metadata.",
             exc,
         )
+        if _pool is not None:
+            try:
+                import asyncio
+                await asyncio.wait_for(_pool.close(), timeout=1.0)
+            except Exception:
+                pass
         _pool = None
         _checkpointer = MemorySaver()
 

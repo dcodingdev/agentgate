@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import React from 'react'
 import {
   Clock,
-  Coins,
   Cpu,
   FileCode2,
   Terminal,
@@ -23,6 +22,8 @@ interface LiveSandboxScreenProps {
   repo?: string
   issueTitle?: string
   elapsedSeconds?: number
+  hasActiveRun?: boolean
+  onStartNewRun?: () => void
 }
 
 interface LogEntry {
@@ -54,20 +55,49 @@ const getActionLabel = (node: string): string => {
 
 export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
   sandboxId = 'sbx-8931a',
-  currentAttempt = 2,
+  currentAttempt = 1,
   maxAttempts = 3,
   events = [],
   terminologyMode = 'both',
-  repo = 'priya/shop-api',
-  issueTitle = 'Support Ed25519 asymmetric signatures for client JWTs',
-  elapsedSeconds = 222,
+  repo = '',
+  issueTitle = '',
+  elapsedSeconds = 0,
+  hasActiveRun = false,
+  onStartNewRun,
 }) => {
-  const [selectedAttemptTab, setSelectedAttemptTab] = useState<'attempt1' | 'attempt2'>('attempt2')
-
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60)
     const rem = secs % 60
     return `${mins}m ${rem < 10 ? '0' : ''}${rem}s`
+  }
+
+  if (!hasActiveRun) {
+    return (
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-16 text-center space-y-4 animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-2xl bg-[#fff4da] border-2 border-[#18181b] mx-auto flex items-center justify-center shadow-[4px_4px_0px_#18181b]">
+          <Terminal className="w-8 h-8 text-[#0d9488]" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-extrabold text-[#18181b] font-geist">
+            No Active Sandbox Runs
+          </h2>
+          <p className="text-sm text-[#555555] max-w-md mx-auto">
+            You don't have any autonomous agent runs executing right now. Launch an issue from Setup to watch sandbox test iterations and live code patch synthesis.
+          </p>
+        </div>
+        {onStartNewRun && (
+          <div className="pt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={onStartNewRun}
+              className="btn-cta text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Start Autonomous Run &rarr;</span>
+            </button>
+          </div>
+        )}
+      </div>
+    )
   }
 
   // 8-Stage Tracker status mapping
@@ -82,26 +112,17 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
     '08': { status: 'Waiting', meta: 'PR' },
   }
 
-  // Fallback logs if no live SSE events are streamed yet
-  const defaultLogs: LogEntry[] = [
-    { node: 'guardrail', message: 'Repository verified in allowlist.', time: '20:41:02' },
-    { node: 'supervisor', message: 'Dispatched parallel research.', time: '20:41:03' },
-    { node: 'research', message: 'Issue & code analysis complete.', time: '20:41:07' },
-    { node: 'sandbox', message: 'Attempt 2 passed: 26/26 tests.', time: '20:41:15', isLatest: true },
-  ]
-
-  const displayLogs: LogEntry[] = events.length > 0
-    ? events.map((ev, idx) => ({
-        node: ev.data?.node || ev.event || 'agent',
-        message: ev.data?.message || ev.data?.status || ev.event,
-        time: ev.timestamp ? ev.timestamp.slice(11, 19) : new Date().toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        }),
-        isLatest: idx === events.length - 1,
-      }))
-    : defaultLogs
+  // Live stream logs from real agent events
+  const displayLogs: LogEntry[] = events.map((ev, idx) => ({
+    node: ev.data?.node || ev.event || 'agent',
+    message: ev.data?.message || ev.data?.status || ev.event,
+    time: ev.timestamp ? ev.timestamp.slice(11, 19) : new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+    isLatest: idx === events.length - 1,
+  }))
 
   // Filter out stages that are already Done to keep the active pipeline uncluttered
   const activeStages = STAGES_CATALOG.filter(
@@ -113,35 +134,22 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
 
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
-      {/* 1. Top Header: Title, LIVE badge, and Clean Abstraction Badges */}
+      {/* 1. Top Header: Title and Clean Abstraction Badges */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b-2 border-[#18181b]">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] tracking-[-0.03em] font-geist">
-              Live Sandbox Execution
-            </h1>
-            <span className="bg-[#d31611] text-white text-[11px] font-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#18181b]">
-              LIVE
-            </span>
-          </div>
-          <p className="text-xs text-[#666666] mt-0.5 font-medium truncate max-w-2xl">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] font-geist">
+            Sandbox Execution
+          </h1>
+          <p className="text-sm text-[#555555] mt-0.5 font-medium truncate max-w-2xl">
             Real-time test commands, patch iterations, and live event feed side-by-side · {issueTitle}
           </p>
         </div>
 
         {/* Right Status Badges */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
           <div className="px-2.5 py-1 rounded bg-white border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#0d9488]" />
             <span>Sandbox #{sandboxId}</span>
-          </div>
-
-          <div className="px-2.5 py-1 rounded bg-white border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b]">
-            Isolated Linux
-          </div>
-
-          <div className="px-2.5 py-1 rounded bg-[#d31611] text-white border border-[#18181b] font-bold shadow-[1px_1px_0px_#18181b]">
-            Network: Read-Only
           </div>
 
           <div className="px-2.5 py-1 rounded bg-[#fffdf8] border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
@@ -149,9 +157,9 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
             <span>{formatTime(elapsedSeconds)}</span>
           </div>
 
-          <div className="px-2.5 py-1 rounded bg-[#fffdf8] border border-[#18181b] text-[#18181b] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
-            <Coins className="w-3.5 h-3.5 text-[#d97706]" />
-            <span>$0.18</span>
+          <div className="px-2.5 py-1 rounded bg-[#ecfdf5] border border-[#18181b] text-[#0d9488] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#0d9488] animate-pulse"></span>
+            <span>Active Run</span>
           </div>
         </div>
       </div>
@@ -161,14 +169,14 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
         {completedStages.length > 0 && (
           <div className="flex items-center justify-between text-xs font-mono px-0.5">
             <div className="flex items-center gap-2 text-[#666666]">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#ebdbb7] text-[#18181b] font-bold text-[11px] border border-[#18181b] shadow-[1px_1px_0px_#18181b]">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#ebdbb7] text-[#18181b] font-bold text-xs border border-[#18181b] shadow-[1px_1px_0px_#18181b]">
                 <span className="text-[#0d9488]">✓</span> {completedStages.length} Actions Completed
               </span>
-              <span className="text-[11px] font-medium hidden sm:inline text-[#666666]">
+              <span className="text-xs font-medium hidden sm:inline text-[#666666]">
                 {completedStages.map((s) => s.plain).join(' · ')}
               </span>
             </div>
-            <span className="text-[10px] text-[#666666] hidden md:inline">
+            <span className="text-xs text-[#666666] hidden md:inline">
               Active &amp; pending pipeline
             </span>
           </div>
@@ -192,11 +200,11 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
                 className={`p-2.5 rounded-lg text-xs flex items-center justify-between min-h-[46px] transition ${cardStyle}`}
               >
                 <div className="truncate mr-1">
-                  <span className="font-extrabold text-[12px] leading-tight text-[#18181b]">
-                    {stage.step.replace(/^0/, '')}. {primary}
+                  <span className="font-extrabold text-sm leading-tight text-[#18181b]">
+                    {primary}
                   </span>
                   {secondary && (
-                    <span className="hidden xl:inline text-[9px] font-mono text-[#666666] ml-1">
+                    <span className="hidden xl:inline text-xs font-mono text-[#666666] ml-1">
                       ({secondary})
                     </span>
                   )}
@@ -204,11 +212,11 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
 
                 <div className="shrink-0 text-right">
                   {isRunning ? (
-                    <span className="font-bold text-[11px] text-[#d31611] px-1.5 py-0.5 bg-[#d31611]/10 rounded border border-[#d31611]">
+                    <span className="font-bold text-xs text-[#d31611] px-1.5 py-0.5 bg-[#d31611]/10 rounded border border-[#d31611]">
                       {state?.meta}
                     </span>
                   ) : (
-                    <span className="text-[10px] font-mono font-bold opacity-75">
+                    <span className="text-xs font-mono font-bold opacity-75">
                       {state?.meta}
                     </span>
                   )}
@@ -221,56 +229,54 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
 
       {/* 3. Three Equal-Height Side-by-Side Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-        {/* COLUMN 1: Test Runner [Active] */}
+        {/* COLUMN 1: Test Runner / Execution Terminal */}
         <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
           {/* Header */}
           <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-[#0d9488]" />
-              <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
+              <h2 className="text-sm font-extrabold text-[#18181b] font-geist">
                 Test Runner
               </h2>
-              <span className="badge-teal text-[10px]">Active</span>
+              <span className="badge-teal text-xs">Sandbox</span>
             </div>
 
-            {/* Attempts Pill Tabs */}
-            <div className="flex items-center gap-1 text-[10px] font-mono font-bold">
-              <span className="px-1.5 py-0.5 rounded bg-[#ebdbb7] border border-[#18181b] text-[#18181b]">
-                1/3 Done
-              </span>
-              <span className="px-1.5 py-0.5 rounded bg-[#d31611] text-white border border-[#18181b]">
-                2/3 Active
-              </span>
-              <span className="px-1.5 py-0.5 rounded bg-white border border-[#e5e5e5] text-[#666666]">
-                3/3 Queued
-              </span>
+            <div className="text-xs font-mono font-bold text-[#666666]">
+              Attempt {currentAttempt}/{maxAttempts}
             </div>
           </div>
 
           {/* Subheader */}
-          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
-            <span>tty0 · /repo/{repo}</span>
-            <span>pytest v9.1.1</span>
+          <div className="h-7 flex items-center justify-between text-xs text-[#666666] font-mono shrink-0">
+            <span>{repo ? `/repo/${repo}` : 'sandbox environment'}</span>
+            <span>live output</span>
           </div>
 
           {/* Terminal Console */}
           <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-2">
-            <div>
-              <span className="text-[#f87171] font-bold">$ </span>
-              <span className="text-slate-100">git apply patch_v2.diff &amp;&amp; pytest -q</span>
-            </div>
-            <div className="text-slate-400 text-[11px]">
-              running 26 tests across 4 test suites in isolated sandbox...
-            </div>
-            <div className="text-[#4ade80] font-bold text-xs pt-1">
-              ✓ 26 passed in 3.1s <span className="text-slate-400 font-normal">(24 baseline + 2 regression)</span>
-            </div>
-            <div className="text-teal-300 text-[11px]">
-              Coverage: +1.4% lines covered in src/auth/jwt_manager.py
-            </div>
-            <div className="pt-3 border-t border-slate-800 text-[10px] text-slate-500">
-              # Sandbox isolation verified: read-only filesystem, zero leaked credentials.
-            </div>
+            {events.length > 0 ? (
+              events.map((ev, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span className="text-[#0d9488] font-bold">[{ev.data?.node || ev.event || 'agent'}]</span>
+                    <span>{ev.timestamp || ''}</span>
+                  </div>
+                  <p className="text-slate-100 whitespace-pre-wrap leading-relaxed">
+                    {typeof ev.data?.message === 'string'
+                      ? ev.data.message
+                      : ev.data?.status
+                      ? `Status: ${ev.data.status}`
+                      : JSON.stringify(ev.data || {})}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-2 py-10">
+                <Terminal className="w-8 h-8 opacity-40 text-slate-400" />
+                <p className="text-xs">Isolated sandbox runner active.</p>
+                <p className="text-[11px] text-slate-600">Executing test commands and code generation...</p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -280,126 +286,83 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
           <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
             <div className="flex items-center gap-2">
               <FileCode2 className="w-4 h-4 text-[#0d9488]" />
-              <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
+              <h2 className="text-sm font-extrabold text-[#18181b] font-geist">
                 Patch Diff Synthesis
               </h2>
-            </div>
-
-            {/* Attempt Switcher Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setSelectedAttemptTab('attempt1')}
-                className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
-                  selectedAttemptTab === 'attempt1'
-                    ? 'bg-[#18181b] text-white border border-[#18181b]'
-                    : 'bg-white text-[#18181b] border border-[#18181b]'
-                }`}
-              >
-                Att 1
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedAttemptTab('attempt2')}
-                className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
-                  selectedAttemptTab === 'attempt2'
-                    ? 'bg-[#d31611] text-white border border-[#18181b]'
-                    : 'bg-white text-[#18181b] border border-[#18181b]'
-                }`}
-              >
-                Att 2 (Passed)
-              </button>
             </div>
           </div>
 
           {/* Subheader */}
-          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
-            <span className="font-bold text-[#18181b]">src/auth/jwt_manager.py</span>
-            <span className="text-[#0d9488] font-bold">+18 lines / -4 lines</span>
+          <div className="h-7 flex items-center justify-between text-xs text-[#666666] font-mono shrink-0">
+            <span className="font-bold text-[#18181b] truncate max-w-[200px]">{repo || 'Target Repository'}</span>
+            <span className="text-[#0d9488] font-bold">Code Patch</span>
           </div>
 
           {/* Diff Box */}
           <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
-            {selectedAttemptTab === 'attempt2' ? (
-              <>
-                <div className="text-slate-500 text-[10px] pb-1">
-                  # Attempt 2: Added RFC 8037 Ed25519 signature verification
-                </div>
-                <div className="text-[#60a5fa] text-[11px]">--- a/src/auth/jwt_manager.py</div>
-                <div className="text-[#60a5fa] text-[11px]">+++ b/src/auth/jwt_manager.py</div>
-                <div className="text-slate-500 text-[11px]">@@ -54,8 +54,14 @@ def verify_jwt_signature(token: str, key):</div>
-                <div className="text-slate-400">     header = jwt.get_unverified_header(token)</div>
-                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +    if header.get("alg") == "EdDSA":
-                </div>
-                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-                </div>
-                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +        public_key = Ed25519PublicKey.from_public_bytes(key)
-                </div>
-                <div className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold">
-                  +        return jwt.decode(token, public_key, algorithms=["EdDSA"])
-                </div>
-                <div className="text-slate-400">     # Fallback to standard RSA/ECDSA verification</div>
-                <div className="text-slate-400">     return jwt.decode(token, key, algorithms=["RS256"])</div>
-              </>
+            {events.some((e) => e.data?.pr_url || (typeof e.data?.message === 'string' && (e.data.message.includes('diff') || e.data.message.includes('Patch')))) ? (
+              <div className="space-y-2 text-slate-200">
+                <div className="text-xs text-[#0d9488] font-bold">Generated Patch:</div>
+                <pre className="text-xs text-[#4ade80] whitespace-pre-wrap font-mono">
+                  {events.find((e) => typeof e.data?.message === 'string' && (e.data.message.includes('diff') || e.data.message.includes('Patch')))?.data?.message || 'Patch verified and passing.'}
+                </pre>
+              </div>
             ) : (
-              <>
-                <div className="text-slate-500 text-[10px] pb-1">
-                  # Attempt 1: naive decode threw InvalidKeyError on raw bytes
-                </div>
-                <div className="text-[#f87171] bg-[#f87171]/15 px-1 rounded font-bold">
-                  -    return jwt.decode(token, key, algorithms=["EdDSA"])
-                </div>
-                <div className="text-slate-400 pt-2 text-[11px]">
-                  # Result: Test suite failed with InvalidAlgorithmError.
-                </div>
-              </>
+              <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-2 py-10">
+                <FileCode2 className="w-8 h-8 opacity-40 text-slate-400" />
+                <p className="text-xs">No patch synthesized yet.</p>
+                <p className="text-[11px] text-slate-600">The agent is analyzing the repository to craft the code patch.</p>
+              </div>
             )}
           </div>
         </section>
 
-        {/* COLUMN 3: Live Stream */}
+        {/* COLUMN 3: Event Stream */}
         <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
           {/* Header */}
           <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
-            <h2 className="text-xs font-extrabold text-[#18181b] font-geist">
-              Live Stream
+            <h2 className="text-sm font-extrabold text-[#18181b] font-geist">
+              Event Stream
             </h2>
-            <span className="text-[10px] font-mono text-[#666666]">
-              Live Events
+            <span className="text-xs font-mono text-[#666666]">
+              {events.length} Events
             </span>
           </div>
 
           {/* Subheader */}
-          <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
+          <div className="h-7 flex items-center justify-between text-xs text-[#666666] font-mono shrink-0">
             <span>Action</span>
             <span>Status</span>
           </div>
 
           {/* Events Log Cards Container */}
           <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-0.5">
-            {displayLogs.map((log, idx) => (
-              <div
-                key={idx}
-                className={`p-2.5 rounded-lg border-2 border-[#18181b] transition ${
-                  log.isLatest
-                    ? 'bg-[#ebdbb7] shadow-[2px_2px_0px_#18181b]'
-                    : 'bg-white shadow-[1px_1px_0px_#18181b]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="font-black text-[#d31611]">
-                    [{getActionLabel(log.node)}]
-                  </span>
-                  <span className="text-[#666666] text-[10px]">{log.time}</span>
+            {displayLogs.length > 0 ? (
+              displayLogs.map((log, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2.5 rounded-lg border-2 border-[#18181b] transition ${
+                    log.isLatest
+                      ? 'bg-[#ebdbb7] shadow-[2px_2px_0px_#18181b]'
+                      : 'bg-white shadow-[1px_1px_0px_#18181b]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="font-black text-[#d31611]">
+                      [{getActionLabel(log.node)}]
+                    </span>
+                    <span className="text-[#666666] text-xs">{log.time}</span>
+                  </div>
+                  <p className="text-sm font-bold text-[#18181b] mt-1 leading-snug">
+                    {log.message}
+                  </p>
                 </div>
-                <p className="text-xs font-bold text-[#18181b] mt-0.5 leading-snug">
-                  {log.message}
-                </p>
+              ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-[#888888] space-y-2 py-10">
+                <p className="text-xs">Awaiting real-time events...</p>
               </div>
-            ))}
+            )}
           </div>
         </section>
       </div>

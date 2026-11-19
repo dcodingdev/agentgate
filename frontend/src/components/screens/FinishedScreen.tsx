@@ -9,9 +9,9 @@ interface FinishedScreenProps {
 }
 
 export const FinishedScreen: React.FC<FinishedScreenProps> = ({
-  prUrl = 'https://github.com/priya/shop-api/pull/42',
-  prNumber = 42,
-  repo = 'priya/shop-api',
+  prUrl = '',
+  prNumber = '',
+  repo = '',
   onStartNewRun,
 }) => {
   const [copied, setCopied] = useState(false)
@@ -70,12 +70,9 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
             ✓
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 id="pr-success-heading" className="text-base sm:text-lg font-extrabold text-[#18181b] font-geist">
-                Pull Request #{displayPrNumber} Published
-              </h1>
-              <span className="badge-warm text-[10px]">Status: Done</span>
-            </div>
+            <h1 id="pr-success-heading" className="text-base sm:text-lg font-extrabold text-[#18181b] font-geist">
+              Pull Request #{displayPrNumber} Published
+            </h1>
             <p className="text-[11px] text-[#666666] font-medium">
               Target: <span className="font-bold text-[#18181b]">{repo.replace(/^https?:\/\/github\.com\//i, '')}</span> &larr; merged from verified sandbox patch
             </p>

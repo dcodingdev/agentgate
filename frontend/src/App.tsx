@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type {
   CreateRunRequest,
-  GraphNodeId,
   RunStateResponse,
   ScreenId,
   StreamEventPayload,
@@ -10,13 +9,10 @@ import type {
 import { createRun, getRunState, resumeRun, subscribeToRunEvents } from './services/api'
 import { TopAppBar } from './components/TopAppBar'
 import { LeftNavRail } from './components/LeftNavRail'
-import { ExecutionGraph } from './components/ExecutionGraph'
+import { GitHubSecretModal } from './components/GitHubSecretModal'
 import { SetupScreen } from './components/screens/SetupScreen'
 import { LiveSandboxScreen } from './components/screens/LiveSandboxScreen'
-import { EveryStageScreen } from './components/screens/EveryStageScreen'
 import { ApprovalGateScreen } from './components/screens/ApprovalGateScreen'
-import { ClarificationScreen } from './components/screens/ClarificationScreen'
-import { BlockedScreen } from './components/screens/BlockedScreen'
 import { FinishedScreen } from './components/screens/FinishedScreen'
 import { PoliciesScreen } from './components/screens/PoliciesScreen'
 import { AuditScreen } from './components/screens/AuditScreen'
@@ -30,24 +26,53 @@ export default function App() {
   const [runState, setRunState] = useState<RunStateResponse | null>(null)
   const [events, setEvents] = useState<StreamEventPayload[]>([])
   const [loading, setLoading] = useState<boolean>(false)
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(72)
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Session context matching Image 1 & Image 2
-  const [activeRepo, setActiveRepo] = useState<string>('priya/shop-api')
-  const [activeIssueTitle, setActiveIssueTitle] = useState<string>('Login tokens never expire')
-  const [activeIssueNumber, setActiveIssueNumber] = useState<string | number>('60')
-  const [sandboxId, setSandboxId] = useState<string>('sbx_8f21')
-  const [currentAttempt, setCurrentAttempt] = useState<number>(2)
-  const [showWorkflowGraph, setShowWorkflowGraph] = useState<boolean>(false)
-  const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNodeId | null>(null)
+  // Active session context populated when a run is launched
+  const [activeRepo, setActiveRepo] = useState<string>('')
+  const [activeIssueTitle, setActiveIssueTitle] = useState<string>('')
+  const [activeIssueNumber, setActiveIssueNumber] = useState<string | number>('')
+  const [sandboxId, setSandboxId] = useState<string>('sbx-pending')
+  const [currentAttempt, setCurrentAttempt] = useState<number>(1)
   const terminologyMode: TerminologyMode = 'plain' // Permanently Plain mode
+
+  // GitHub Secret (PAT) State & Landing Modal
+  const [githubToken, setGithubToken] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('agentgate_github_token')) || ''
+  })
+  const [githubUsername, setGithubUsername] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('agentgate_github_username')) || ''
+  })
+  const [showSecretModal, setShowSecretModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    const token = localStorage.getItem('agentgate_github_token')
+    const dismissed = sessionStorage.getItem('agentgate_secret_dismissed')
+    // First thing to ask when landing on website if secret is not set and not dismissed
+    return !token && !dismissed
+  })
+
+  const handleSaveSecret = (token: string, username: string) => {
+    setGithubToken(token)
+    setGithubUsername(username)
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('agentgate_github_token', token)
+      } else {
+        localStorage.removeItem('agentgate_github_token')
+      }
+      if (username) {
+        localStorage.setItem('agentgate_github_username', username)
+      } else {
+        localStorage.removeItem('agentgate_github_username')
+      }
+    }
+  }
 
   // Timer for running badge
   useEffect(() => {
     if (
       currentScreen === 'setup' ||
-      currentScreen === 'blocked' ||
       currentScreen === 'finished' ||
       runState?.status === 'completed' ||
       runState?.status === 'rejected'
@@ -138,7 +163,7 @@ export default function App() {
 
         if (event === 'rejected') {
           setRunState((prev) => (prev ? { ...prev, status: 'rejected' } : null))
-          setCurrentScreen('blocked')
+          setErrorMessage(data?.reason || 'Run was rejected by policy.')
         }
 
         if (event === 'done') {
@@ -156,8 +181,14 @@ export default function App() {
     }
   }, [threadId, syncState])
 
-  // Start run handler
+  // Start run handler - strictly enforces GitHub Secret key
   const handleStartRun = async (request: CreateRunRequest) => {
+    if (!githubToken.trim()) {
+      setShowSecretModal(true)
+      setErrorMessage('GitHub Secret Key required. Please insert your Personal Access Token in the dialog to start a run.')
+      return
+    }
+
     try {
       setLoading(true)
       setErrorMessage(null)
@@ -165,16 +196,12 @@ export default function App() {
       setActiveIssueTitle(request.issue_title || 'Autonomous bugfix')
 
       const match = request.issue_url.match(/issues\/(\d+)/)
-      setActiveIssueNumber(match ? match[1] : '60')
+      setActiveIssueNumber(match ? match[1] : '')
 
-      // Check if unapproved repo is passed
-      if (request.repo === 'org/internal-tools') {
-        setCurrentScreen('blocked')
-        setLoading(false)
-        return
-      }
-
-      const res = await createRun(request)
+      const res = await createRun({
+        ...request,
+        github_token: githubToken.trim(),
+      })
       setThreadId(res.thread_id)
       setEvents([])
       setElapsedSeconds(0)
@@ -184,7 +211,7 @@ export default function App() {
         'Backend connection note: Could not reach FastAPI at http://127.0.0.1:8000. ' +
         (err.message || 'Make sure the backend is running.')
       )
-      // Still show the live sandbox preview on canvas
+      // Show the live sandbox on canvas
       setCurrentScreen('live-sandbox')
     } finally {
       setLoading(false)
@@ -209,16 +236,16 @@ export default function App() {
 
   const handleReject = async (reason: string) => {
     if (!threadId) {
-      setCurrentScreen('blocked')
+      setCurrentScreen('live-sandbox')
       return
     }
     try {
       await resumeRun(threadId, { approved: false, feedback: reason })
-      setCurrentScreen('blocked')
+      setCurrentScreen('live-sandbox')
       syncState(threadId)
     } catch (err) {
       console.error('Failed to resume with rejection:', err)
-      setCurrentScreen('blocked')
+      setCurrentScreen('live-sandbox')
     }
   }
 
@@ -237,6 +264,21 @@ export default function App() {
     }
   }
 
+  // Derived execution states for clean new user & active run UX
+  const hasActiveRun =
+    runState?.status === 'running' ||
+    (loading && currentScreen === 'live-sandbox') ||
+    Boolean(
+      threadId &&
+      runState &&
+      runState.status !== 'completed' &&
+      runState.status !== 'rejected' &&
+      runState.status !== 'paused_hitl'
+    )
+  const hasPendingApproval = Boolean(runState?.status === 'paused_hitl')
+  const activeRunsCount = hasActiveRun ? 1 : 0
+  const pendingSignOffCount = hasPendingApproval ? 1 : 0
+
   return (
     <div className="min-h-screen bg-[#fffdf8] text-[#18181b] flex flex-col font-sans selection:bg-[#fff4da] selection:text-[#d31611]">
       {/* 1. Sleek Top Application Bar */}
@@ -246,77 +288,27 @@ export default function App() {
           setCurrentScreen(screen)
           setErrorMessage(null)
         }}
+        githubUsername={githubUsername}
+        onOpenSecretModal={() => setShowSecretModal(true)}
       />
 
       {/* 2. Workspace Body: Left Navigation Rail + Right Main Canvas */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Navigation Rail (Contains Navigation & Workflow Graph Toggle) */}
+        {/* Left Navigation Rail */}
         <LeftNavRail
           currentScreen={currentScreen}
           onSelectScreen={(screen) => {
             setCurrentScreen(screen)
             setErrorMessage(null)
           }}
-          activeRunsCount={2}
-          pendingSignOffCount={1}
-          showWorkflowGraph={showWorkflowGraph}
-          onToggleWorkflowGraph={() => setShowWorkflowGraph((prev) => !prev)}
+          activeRunsCount={activeRunsCount}
+          pendingSignOffCount={pendingSignOffCount}
+          githubUsername={githubUsername}
+          onOpenSecretModal={() => setShowSecretModal(true)}
         />
 
         {/* Right Main Canvas Content */}
         <main className="flex-1 overflow-y-auto bg-[#fffdf8] pb-12">
-          {/* LangGraph Multi-Agent Stepper (Toggled on Demand) */}
-          {showWorkflowGraph && (
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
-              <ExecutionGraph
-                currentNode={
-                  runState?.values?.current_node ||
-                  (runState?.status === 'paused_hitl'
-                    ? 'hitl'
-                    : currentScreen === 'live-sandbox'
-                    ? 'verify'
-                    : currentScreen === 'approval-gate'
-                    ? 'hitl'
-                    : currentScreen === 'finished'
-                    ? 'pr_agent'
-                    : currentScreen === 'blocked'
-                    ? 'guardrail'
-                    : null)
-                }
-                completedNodes={
-                  (runState?.values?.completed_nodes as string[]) ||
-                  (currentScreen === 'live-sandbox'
-                    ? ['guardrail', 'supervisor', 'research', 'fix_test']
-                    : currentScreen === 'approval-gate'
-                    ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer']
-                    : currentScreen === 'finished'
-                    ? ['guardrail', 'supervisor', 'research', 'fix_test', 'verify', 'reviewer', 'hitl', 'pr_agent']
-                    : currentScreen === 'clarification'
-                    ? ['guardrail', 'supervisor']
-                    : currentScreen === 'blocked'
-                    ? []
-                    : [])
-                }
-                status={
-                  runState?.status ||
-                  (currentScreen === 'approval-gate'
-                    ? 'paused_hitl'
-                    : currentScreen === 'finished'
-                    ? 'completed'
-                    : currentScreen === 'blocked'
-                    ? 'rejected'
-                    : currentScreen === 'clarification'
-                    ? 'waiting'
-                    : currentScreen === 'setup'
-                    ? 'idle'
-                    : 'running')
-                }
-                selectedNode={selectedGraphNode}
-                onSelectNode={setSelectedGraphNode}
-              />
-            </section>
-          )}
-
           {/* Error Banner */}
           {errorMessage && (
             <aside
@@ -351,6 +343,9 @@ export default function App() {
               onStartRun={handleStartRun}
               loading={loading}
               terminologyMode={terminologyMode}
+              githubToken={githubToken}
+              githubUsername={githubUsername}
+              onOpenSecretModal={() => setShowSecretModal(true)}
             />
           )}
 
@@ -364,6 +359,8 @@ export default function App() {
               repo={activeRepo}
               issueTitle={activeIssueTitle}
               elapsedSeconds={elapsedSeconds}
+              hasActiveRun={hasActiveRun}
+              onStartNewRun={() => setCurrentScreen('setup')}
             />
           )}
 
@@ -375,31 +372,14 @@ export default function App() {
               terminologyMode={terminologyMode}
               repo={activeRepo}
               issueTitle={activeIssueTitle}
-            />
-          )}
-
-          {currentScreen === 'every-stage' && <EveryStageScreen />}
-
-          {currentScreen === 'clarification' && (
-            <ClarificationScreen
-              onSubmitClarification={(_choice, _notes) => {
-                setCurrentScreen('live-sandbox')
-              }}
-            />
-          )}
-
-          {currentScreen === 'blocked' && (
-            <BlockedScreen
-              onRetryWithRepo={(repo) => {
-                setActiveRepo(repo)
-                setCurrentScreen('setup')
-              }}
+              hasPendingApproval={hasPendingApproval}
+              onStartNewRun={() => setCurrentScreen('setup')}
             />
           )}
 
           {currentScreen === 'finished' && (
             <FinishedScreen
-              prUrl={runState?.pr_url || `https://github.com/${activeRepo}/pull/61`}
+              prUrl={runState?.pr_url || (activeRepo ? `https://github.com/${activeRepo}/pull/1` : '')}
               repo={activeRepo}
               prNumber={activeIssueNumber}
               onStartNewRun={() => setCurrentScreen('setup')}
@@ -411,10 +391,22 @@ export default function App() {
           )}
 
           {currentScreen === 'audit' && (
-            <AuditScreen terminologyMode={terminologyMode} />
+            <AuditScreen
+              terminologyMode={terminologyMode}
+              onStartNewRun={() => setCurrentScreen('setup')}
+            />
           )}
         </main>
       </div>
+
+      {/* GitHub Secret Modal (Prompts on first landing or on demand) */}
+      <GitHubSecretModal
+        isOpen={showSecretModal}
+        onClose={() => setShowSecretModal(false)}
+        currentSecret={githubToken}
+        currentUsername={githubUsername}
+        onSaveSecret={handleSaveSecret}
+      />
     </div>
   )
 }

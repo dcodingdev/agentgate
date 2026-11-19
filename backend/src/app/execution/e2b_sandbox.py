@@ -36,8 +36,11 @@ async def create_sandbox(template: Optional[str] = None) -> str:
         Sandbox = _get_e2b_sandbox_class()
         if Sandbox is not None:
             try:
-                sandbox = Sandbox(template=template_name, api_key=settings.e2b_api_key)
-                sandbox_id = sandbox.sandbox_id
+                if hasattr(Sandbox, "create"):
+                    sandbox = Sandbox.create(template=template_name, api_key=settings.e2b_api_key)
+                else:
+                    sandbox = Sandbox(api_key=settings.e2b_api_key)
+                sandbox_id = getattr(sandbox, "sandbox_id", getattr(sandbox, "id", str(uuid.uuid4().hex[:12])))
                 _active_sandboxes[sandbox_id] = sandbox
                 logger.info("Created real E2B sandbox: %s (template: %s)", sandbox_id, template_name)
                 return sandbox_id

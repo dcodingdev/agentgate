@@ -83,7 +83,12 @@ class MultiServerMCPClient:
                 .strip("/")
             )
             token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
-            is_mock_repo = clean_repo in ("test/repo", "org/repo", "mock/repo") or clean_repo.startswith("test/")
+            is_mock_repo = (
+                clean_repo in ("test/repo", "org/repo", "mock/repo")
+                or clean_repo.startswith("test/")
+                or clean_repo.startswith("mock/")
+                or clean_repo.startswith("acme/")
+            )
 
             if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
                 import httpx
@@ -110,8 +115,58 @@ class MultiServerMCPClient:
                                     "body": data.get("body", ""),
                                     "labels": [l.get("name") for l in data.get("labels", []) if isinstance(l, dict)],
                                 }
+                            logger.warning("GitHub API get_issue sync returned %s: %s", resp.status_code, resp.text)
                     except Exception as exc:
                         logger.warning("GitHub API get_issue sync error (%s), using fallback.", exc)
+
+                elif tool_name == "create_pull_request":
+                    title = arguments.get("title", "SWE Automated Bugfix")
+                    head = arguments.get("head", arguments.get("head_branch", "main"))
+                    body = arguments.get("body", "Automated PR created by AgentGate")
+                    try:
+                        with httpx.Client(timeout=15.0) as client:
+                            repo_resp = client.get(f"https://api.github.com/repos/{clean_repo}", headers=headers)
+                            base = repo_resp.json().get("default_branch", "main") if repo_resp.status_code == 200 else "main"
+
+                            ref_resp = client.get(f"https://api.github.com/repos/{clean_repo}/git/ref/heads/{head}", headers=headers)
+                            if ref_resp.status_code == 404:
+                                base_ref = client.get(f"https://api.github.com/repos/{clean_repo}/git/ref/heads/{base}", headers=headers)
+                                if base_ref.status_code == 200:
+                                    base_sha = base_ref.json().get("object", {}).get("sha")
+                                    if base_sha:
+                                        client.post(
+                                            f"https://api.github.com/repos/{clean_repo}/git/refs",
+                                            headers=headers,
+                                            json={"ref": f"refs/heads/{head}", "sha": base_sha},
+                                        )
+
+                            resp = client.post(
+                                f"https://api.github.com/repos/{clean_repo}/pulls",
+                                headers=headers,
+                                json={"title": title, "head": head, "base": base, "body": body},
+                            )
+                            if resp.status_code in (200, 201):
+                                data = resp.json()
+                                return {
+                                    "pr_url": data.get("html_url"),
+                                    "status": "created",
+                                    "pr_number": data.get("number"),
+                                }
+                            if resp.status_code == 422:
+                                existing_resp = client.get(
+                                    f"https://api.github.com/repos/{clean_repo}/pulls?head={clean_repo.split('/')[0]}:{head}",
+                                    headers=headers,
+                                )
+                                if existing_resp.status_code == 200 and existing_resp.json():
+                                    data = existing_resp.json()[0]
+                                    return {
+                                        "pr_url": data.get("html_url"),
+                                        "status": "created",
+                                        "pr_number": data.get("number"),
+                                    }
+                            logger.warning("GitHub API create_pull_request sync returned %s: %s", resp.status_code, resp.text)
+                    except Exception as exc:
+                        logger.warning("GitHub API create_pull_request sync error (%s), using fallback.", exc)
 
             if tool_name == "get_issue":
                 return {
@@ -159,7 +214,12 @@ class MultiServerMCPClient:
             )
             token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
 
-            is_mock_repo = clean_repo in ("test/repo", "org/repo", "mock/repo") or clean_repo.startswith("test/")
+            is_mock_repo = (
+                clean_repo in ("test/repo", "org/repo", "mock/repo")
+                or clean_repo.startswith("test/")
+                or clean_repo.startswith("mock/")
+                or clean_repo.startswith("acme/")
+            )
             if is_mock_repo or not token or token.startswith("mock") or token.startswith("ghp_your"):
                 return self.call_tool_sync(server_name, tool_name, arguments)
 
@@ -292,7 +352,6 @@ class MultiServerMCPClient:
                     except Exception as exc:
                         logger.warning("GitHub API create_pull_request error (%s), using fallback.", exc)
 
-            # Fallback handlers for standard tool calls
             if tool_name == "get_issue":
                 return {
                     "issue_id": arguments.get("issue_id", 1),
@@ -313,12 +372,6 @@ class MultiServerMCPClient:
             }
 
         return {"status": "ok", "result": f"Executed {tool_name} on {server_name}"}
-
-    async def disconnect_all(self) -> None:
-        """Close all MCP server connections."""
-        logger.info("Closing MultiServerMCPClient connections...")
-        self.connected_servers.clear()
-        self.tools_cache.clear()
 
 
 _mcp_client: Optional[MultiServerMCPClient] = None

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   CheckCircle2,
+  CheckSquare,
   FileCode2,
   RotateCcw,
   ShieldCheck,
@@ -17,6 +18,8 @@ interface ApprovalGateScreenProps {
   terminologyMode?: TerminologyMode
   repo?: string
   issueTitle?: string
+  hasPendingApproval?: boolean
+  onStartNewRun?: () => void
 }
 
 export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
@@ -24,8 +27,10 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   onRequestChanges,
   onReject,
   terminologyMode = 'both',
-  repo = 'priya/shop-api',
-  issueTitle = 'Support Ed25519 asymmetric signatures for client JWTs',
+  repo = '',
+  issueTitle = '',
+  hasPendingApproval = false,
+  onStartNewRun,
 }) => {
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified')
   const [showSandboxEditor, setShowSandboxEditor] = useState<boolean>(false)
@@ -35,7 +40,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   const [submittedStatus, setSubmittedStatus] = useState<string | null>(null)
 
   // Dual-vocabulary labels
-  const { primary: signOffTitle, secondary: signOffTech } = formatDualTerm(
+  const { primary: signOffTitle } = formatDualTerm(
     'Human Sign-Off',
     'hitl',
     terminologyMode
@@ -45,7 +50,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
     'supervisor',
     terminologyMode
   )
-  const { primary: riskInspectorTitle, secondary: riskInspectorTech } = formatDualTerm(
+  const { primary: riskInspectorTitle } = formatDualTerm(
     'Risk Review',
     'reviewer',
     terminologyMode
@@ -53,7 +58,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
 
   const handleApprove = () => {
     setSubmittedStatus(
-      'Approved! Dispatching PR creation to open upstream GitHub Pull Request #61...'
+      'Approved! Dispatching PR creation to open upstream GitHub Pull Request...'
     )
     if (onApprove) onApprove()
   }
@@ -80,6 +85,35 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
     if (onReject) onReject(feedback)
   }
 
+  if (!hasPendingApproval) {
+    return (
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-16 text-center space-y-4 animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-2xl bg-[#fff4da] border-2 border-[#18181b] mx-auto flex items-center justify-center shadow-[4px_4px_0px_#18181b]">
+          <CheckSquare className="w-8 h-8 text-[#0d9488]" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-extrabold text-[#18181b] font-geist">
+            No Pending Sign-Offs
+          </h2>
+          <p className="text-sm text-[#555555] max-w-md mx-auto">
+            All changes are cleared. When an autonomous run crafts a pull request requiring human review and authorization, it will pause here for line-by-line inspection.
+          </p>
+        </div>
+        {onStartNewRun && (
+          <div className="pt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={onStartNewRun}
+              className="btn-cta text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Start Autonomous Run &rarr;</span>
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
       {/* 1. Emergency Intercept Alert Banner */}
@@ -95,18 +129,14 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm sm:text-base font-extrabold text-[#18181b] font-geist">
-                {signOffTitle} {signOffTech ? `(${signOffTech})` : ''} Required · Emergency Gate Triggered
+                {signOffTitle} Required
               </h1>
               <span className="badge-red text-[10px]">
-                Risk Score: 0.85 &gt; 0.70 Ceil
+                Risk Score: 0.85 (Threshold: 0.70)
               </span>
             </div>
             <p className="text-xs text-[#92400e] font-medium mt-0.5">
-              {riskInspectorTitle} ({riskInspectorTech}) intercepted modifications for <strong>{issueTitle}</strong> in module{' '}
-              <code className="bg-white px-1 py-0.5 rounded font-mono font-bold text-[#18181b]">
-                src/auth/jwt_manager.py
-              </code>
-              . Pausing for human authorization.
+              {riskInspectorTitle} intercepted modifications for <strong>{issueTitle || repo}</strong>. Pausing for human authorization.
             </p>
           </div>
         </div>
@@ -127,7 +157,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
             <div className="flex items-center gap-2">
               <FileCode2 className="w-4 h-4 text-[#0d9488]" />
               <span className="text-xs font-extrabold text-[#18181b] font-geist truncate">
-                Candidate Patch · {repo} · src/auth/jwt_manager.py
+                Candidate Patch · {repo || 'Target Repository'}
               </span>
             </div>
 
@@ -369,7 +399,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
                   className="w-full btn-cta py-2.5 text-xs font-bold text-center flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Approve and Open PR #61 &rarr;</span>
+                  <span>Approve and Open GitHub PR &rarr;</span>
                 </button>
 
                 {/* Secondary Actions */}

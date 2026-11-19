@@ -15,6 +15,7 @@ class SWEState(TypedDict, total=False):
     repo: str
     issue_title: str
     issue_description: str
+    github_token: Optional[str]
 
     # Execution sandbox
     sandbox_id: Optional[str]

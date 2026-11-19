@@ -1,7 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
-  AlertCircle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Key,
@@ -17,108 +15,74 @@ interface SetupScreenProps {
   onStartRun: (request: CreateRunRequest) => void
   loading?: boolean
   terminologyMode?: TerminologyMode
+  githubToken?: string
+  githubUsername?: string
+  onOpenSecretModal?: () => void
 }
-
-interface IssuePreset {
-  id: string
-  label: string
-  repo: string
-  url: string
-  title: string
-  description: string
-  acceptanceCriteria: string[]
-  securityClassification: string
-  securityLevel: 'critical' | 'high' | 'standard' | 'blocked'
-}
-
-const ISSUE_PRESETS: IssuePreset[] = [
-  {
-    id: '493',
-    label: '#493 · Ed25519 Signature Support',
-    repo: 'priya/shop-api',
-    url: 'https://github.com/priya/shop-api/issues/493',
-    title: 'Support Ed25519 asymmetric signatures for client tokens',
-    description:
-      'Migrate legacy signature verification in src/crypto/signatures.py to support Ed25519 (RFC 8037) asymmetric key signatures for client tokens.',
-    acceptanceCriteria: [
-      "Parse and validate 'EdDSA' algorithm in token header",
-      'Verify token signatures using Ed25519 public keys from JWKS',
-      'Pass all regression unit and concurrency tests in isolated sandbox',
-    ],
-    securityClassification: 'Tier-1 Critical · Cryptography',
-    securityLevel: 'critical',
-  },
-  {
-    id: '60',
-    label: '#60 · Token Expiration',
-    repo: 'priya/shop-api',
-    url: 'https://github.com/priya/shop-api/issues/60',
-    title: 'Login tokens never expire after user authentication',
-    description:
-      'Authentication session tokens remain valid indefinitely. Enforce strict UTC expiration checking and activity timestamps in session.py.',
-    acceptanceCriteria: [
-      'Enforce SESSION_MAX_AGE_SECONDS (3600s)',
-      'Add regression test in tests/test_session.py',
-    ],
-    securityClassification: 'Tier-2 High Risk · Session Management',
-    securityLevel: 'high',
-  },
-  {
-    id: '5',
-    label: '#5 · DB Migration (Blocked)',
-    repo: 'org/internal-tools',
-    url: 'https://github.com/org/internal-tools/issues/5',
-    title: 'Database migration script failure on Postgres 16',
-    description:
-      'Migration script fails with table lock contention in internal tools repository.',
-    acceptanceCriteria: ['Re-order foreign key constraints'],
-    securityClassification: 'Blocked · Repository Not On Organization Allowlist',
-    securityLevel: 'blocked',
-  },
-]
 
 export const SetupScreen: React.FC<SetupScreenProps> = ({
   onStartRun,
   loading = false,
   terminologyMode = 'both',
+  githubToken: propGithubToken,
+  githubUsername: propGithubUsername,
+  onOpenSecretModal,
 }) => {
   // Dual-vocabulary labels
-  const { primary: secGateTitle } = formatDualTerm(
-    'Security Check',
-    'guardrail',
-    terminologyMode
-  )
   const { primary: safeLabTitle, secondary: safeLabTech } = formatDualTerm(
     'Patch & Test',
     'fix_test',
     terminologyMode
   )
 
-  // Selection states
-  const [selectedPreset, setSelectedPreset] = useState<IssuePreset>(ISSUE_PRESETS[0])
-  const [selectedRepo, setSelectedRepo] = useState<string>(ISSUE_PRESETS[0].repo)
-  const [issueUrl, setIssueUrl] = useState<string>(ISSUE_PRESETS[0].url)
-  const [customGuidance, setCustomGuidance] = useState<string>(
-    'Ensure backward compatibility with existing RSA keys while adding Ed25519 support.'
-  )
+  // Single Target GitHub Issue Input State (No samples, no presets)
+  const [issueUrl, setIssueUrl] = useState<string>('')
+  const [repo, setRepo] = useState<string>('')
+  const [issueNumber, setIssueNumber] = useState<string>('')
+  const [issueTitle, setIssueTitle] = useState<string>('')
+  const [issueDescription, setIssueDescription] = useState<string>('')
+  const [issueLabels, setIssueLabels] = useState<string[]>([])
+  const [fetchingIssue, setFetchingIssue] = useState<boolean>(false)
 
-  // Policy states
+  // Optional guidance & advanced settings
+  const [customGuidance, setCustomGuidance] = useState<string>('')
   const [autoOpenPr, setAutoOpenPr] = useState<boolean>(false)
   const [retryCap, setRetryCap] = useState<number>(3)
   const policyThreshold = 0.7 // Locked policy threshold
 
-  // Accordion toggle states (both closed by default to avoid vertical scrolling)
+  // Accordion toggle states (both closed by default)
   const [showGuidance, setShowGuidance] = useState<boolean>(false)
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
 
-  // Individual user GitHub API Key state (saved in browser localStorage)
+  // Individual user GitHub API Key state
   const [githubToken, setGithubToken] = useState<string>(() => {
-    return localStorage.getItem('agentgate_github_token') || ''
+    return (
+      propGithubToken ||
+      (typeof window !== 'undefined' && localStorage.getItem('agentgate_github_token')) ||
+      ''
+    )
   })
   const [githubUsername, setGithubUsername] = useState<string>(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('agentgate_github_username')) || ''
+    return (
+      propGithubUsername ||
+      (typeof window !== 'undefined' && localStorage.getItem('agentgate_github_username')) ||
+      ''
+    )
   })
   const [showToken, setShowToken] = useState<boolean>(false)
+
+  // Sync token from props
+  useEffect(() => {
+    if (propGithubToken !== undefined) {
+      setGithubToken(propGithubToken)
+    }
+  }, [propGithubToken])
+
+  useEffect(() => {
+    if (propGithubUsername !== undefined) {
+      setGithubUsername(propGithubUsername)
+    }
+  }, [propGithubUsername])
 
   const handleTokenChange = (val: string) => {
     setGithubToken(val)
@@ -145,114 +109,184 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     }
   }
 
-  const handleSelectPreset = (preset: IssuePreset) => {
-    setSelectedPreset(preset)
-    setSelectedRepo(preset.repo)
-    setIssueUrl(preset.url)
+  // Parse GitHub Issue URL and auto-fetch issue details
+  const handleUrlChange = (url: string) => {
+    setIssueUrl(url)
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/i)
+    if (match) {
+      const detectedRepo = `${match[1]}/${match[2]}`
+      const num = match[3]
+      setRepo(detectedRepo)
+      setIssueNumber(num)
+
+      // Fetch live issue info from GitHub
+      setFetchingIssue(true)
+      const headers: Record<string, string> = {
+        Accept: 'application/vnd.github.v3+json',
+      }
+      if (githubToken.trim()) {
+        headers.Authorization = `Bearer ${githubToken.trim()}`
+      }
+      fetch(`https://api.github.com/repos/${detectedRepo}/issues/${num}`, { headers })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.title) {
+            setIssueTitle(data.title)
+            setIssueDescription(data.body || '')
+            if (Array.isArray(data.labels)) {
+              setIssueLabels(
+                data.labels
+                  .map((l: any) => (typeof l === 'string' ? l : l.name))
+                  .filter(Boolean)
+              )
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => setFetchingIssue(false))
+    } else {
+      const repoMatch = url.match(/github\.com\/([^/]+)\/([^/]+)/i)
+      if (repoMatch) {
+        setRepo(`${repoMatch[1]}/${repoMatch[2]}`)
+      } else {
+        setRepo('')
+      }
+      setIssueNumber('')
+      setIssueTitle('')
+      setIssueDescription('')
+      setIssueLabels([])
+    }
   }
 
   const handleStart = () => {
+    if (!githubToken.trim()) {
+      if (onOpenSecretModal) onOpenSecretModal()
+      return
+    }
+    if (!issueUrl.trim()) return
+    const derivedRepo =
+      repo || (issueUrl.match(/github\.com\/([^/]+\/[^/]+)/)?.[1]) || 'custom/repo'
     onStartRun({
-      repo: selectedRepo,
-      issue_url: issueUrl,
-      issue_title: selectedPreset.title,
-      issue_description: selectedPreset.description,
+      repo: derivedRepo,
+      issue_url: issueUrl.trim(),
+      issue_title: issueTitle.trim() || (issueNumber ? `Issue #${issueNumber}` : 'Autonomous issue resolution'),
+      issue_description: issueDescription.trim(),
       retry_cap: retryCap,
       policy_threshold: policyThreshold,
       auto_open_pr: autoOpenPr,
-      team_lead_guidance: customGuidance,
+      team_lead_guidance: customGuidance.trim() || undefined,
       github_token: githubToken.trim() || undefined,
     })
   }
 
-  const isBlockedRepo = selectedRepo === 'org/internal-tools'
+  const hasSecret = Boolean(githubToken.trim())
+  const isValidUrl = Boolean(issueUrl.trim())
 
   return (
-    <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-3 space-y-3 animate-in fade-in duration-200">
-      {/* 1. Compact Header */}
-      <div className="pb-2 border-b-2 border-[#18181b]">
-        <h1 className="text-lg sm:text-xl font-extrabold text-[#18181b] tracking-[-0.03em] font-geist">
+    <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
+      {/* 1. Header */}
+      <div className="pb-3 border-b-2 border-[#18181b]">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-[#18181b] font-geist">
           Start Autonomous Run
         </h1>
-        <p className="text-xs text-[#666666] font-medium">
-          Select a target issue and launch deterministic agent resolution.
+        <p className="text-sm text-[#555555] font-medium mt-0.5">
+          Enter a target GitHub issue to launch deterministic agent resolution.
         </p>
       </div>
 
-      {/* 2. Compact Target Issue Selection & Overview Card */}
-      <section className="card-canvas-elevated p-3 sm:p-3.5 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-extrabold text-[#18181b] uppercase tracking-wider">
-            Target Issue
-          </span>
-          <span className="text-[11px] font-mono font-bold text-[#666666]">
-            {selectedRepo}
-          </span>
-        </div>
-
-        {/* Quick Issue Preset Selectors */}
-        <div className="flex flex-wrap gap-1.5">
-          {ISSUE_PRESETS.map((preset) => {
-            const isSelected = selectedPreset.id === preset.id
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => handleSelectPreset(preset)}
-                className={`text-xs font-bold px-2.5 py-1 rounded-md border transition cursor-pointer flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'border-2 border-[#18181b] bg-[#fff4da] text-[#18181b] shadow-[1px_1px_0px_#18181b]'
-                    : 'border-[#e5e5e5] bg-white text-[#666666] hover:border-[#18181b]'
-                }`}
-              >
-                <span>{preset.label}</span>
-                {preset.securityLevel === 'critical' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#d31611]"></span>
-                )}
-                {preset.securityLevel === 'blocked' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#991b1b]"></span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Selected Issue Preview Card */}
-        <div className="p-2.5 rounded-lg border border-[#18181b] bg-[#fffdf8] space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xs sm:text-sm font-extrabold text-[#18181b] font-geist truncate">
-              {selectedPreset.title}
-            </h2>
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
-                selectedPreset.securityLevel === 'critical'
-                  ? 'bg-[#fee2e2] text-[#991b1b] border-[#dc2626]'
-                  : selectedPreset.securityLevel === 'blocked'
-                  ? 'bg-slate-200 text-slate-800 border-slate-400'
-                  : 'bg-[#fef3c7] text-[#92400e] border-[#d97706]'
-              }`}
+      {/* Secret Key Notice if not inserted */}
+      {!hasSecret && (
+        <aside
+          role="alert"
+          className="p-3.5 bg-[#fef3c7] border-2 border-[#d97706] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-[2px_2px_0px_#d97706]"
+        >
+          <div className="flex items-center gap-2.5">
+            <Key className="w-4 h-4 text-[#d97706] shrink-0" />
+            <span className="font-bold text-[#18181b]">
+              GitHub Secret Required: Insert your personal access token to authorize real repository testing and pull request synthesis.
+            </span>
+          </div>
+          {onOpenSecretModal && (
+            <button
+              type="button"
+              onClick={onOpenSecretModal}
+              className="px-3.5 py-1.5 bg-[#18181b] text-white rounded-md font-bold text-xs hover:bg-[#d31611] transition cursor-pointer shrink-0 text-center"
             >
-              {selectedPreset.securityClassification}
-            </span>
-          </div>
+              Insert Secret Key &rarr;
+            </button>
+          )}
+        </aside>
+      )}
 
-          <p className="text-xs text-[#666666] leading-relaxed line-clamp-2">
-            {selectedPreset.description}
-          </p>
-
-          {/* Acceptance Criteria (Compact Flex Row) */}
-          <div className="pt-1.5 border-t border-[#e5e5e5] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#18181b]">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#666666]">
-              Criteria:
+      {/* 2. Single Target GitHub Issue Input Card (No presets, no sample modes) */}
+      <section className="card-canvas-elevated p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="issue-url-input"
+            className="text-sm font-extrabold text-[#18181b] uppercase tracking-wider"
+          >
+            GitHub Issue URL
+          </label>
+          {repo && (
+            <span className="text-xs font-mono font-bold text-[#0d9488] bg-[#ecfdf5] border border-[#a7f3d0] px-2 py-0.5 rounded">
+              {repo}
             </span>
-            {selectedPreset.acceptanceCriteria.map((crit, idx) => (
-              <span key={idx} className="flex items-center gap-1 font-medium">
-                <CheckCircle2 className="w-3 h-3 text-[#0d9488] shrink-0" />
-                <span>{crit}</span>
-              </span>
-            ))}
-          </div>
+          )}
         </div>
+
+        <div>
+          <input
+            id="issue-url-input"
+            type="url"
+            value={issueUrl}
+            onChange={(e) => handleUrlChange(e.target.value)}
+            placeholder="https://github.com/owner/repository/issues/123"
+            className="w-full bg-white border-2 border-[#18181b] rounded-lg px-3.5 py-2.5 text-sm sm:text-base font-mono text-[#18181b] focus:outline-none focus:border-[#0d9488] shadow-[2px_2px_0px_#18181b]"
+          />
+          <p className="text-xs text-[#666666] mt-1.5">
+            Paste any GitHub issue link. The repository, issue number, and context are automatically resolved.
+          </p>
+        </div>
+
+        {/* Live Detected / Fetched Issue Info Card */}
+        {issueUrl.trim() && (
+          <div className="p-3 rounded-lg border border-[#18181b] bg-[#fffdf8] space-y-1.5 animate-in fade-in duration-150">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold font-mono text-xs sm:text-sm text-[#18181b]">
+                  {repo || 'Detecting repository...'}
+                </span>
+                {issueNumber && (
+                  <span className="badge-teal text-xs">Issue #{issueNumber}</span>
+                )}
+              </div>
+              {fetchingIssue && (
+                <span className="text-xs text-[#666666] font-mono animate-pulse">
+                  Fetching issue details from GitHub...
+                </span>
+              )}
+            </div>
+
+            {issueTitle && (
+              <h2 className="text-sm font-bold text-[#18181b] font-geist">
+                {issueTitle}
+              </h2>
+            )}
+
+            {issueLabels.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {issueLabels.map((lbl, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 rounded bg-white border border-[#e5e5e5] text-[11px] font-mono text-[#555555]"
+                  >
+                    {lbl}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* 3. Optional Guidance (Closed by default - click to expand) */}
@@ -260,7 +294,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
         <button
           type="button"
           onClick={() => setShowGuidance(!showGuidance)}
-          className="w-full px-3.5 py-2 flex items-center justify-between cursor-pointer hover:bg-[#fffdf8] transition text-left"
+          className="w-full px-3.5 py-2.5 flex items-center justify-between cursor-pointer hover:bg-[#fffdf8] transition text-left"
         >
           <div className="flex items-center gap-2">
             {showGuidance ? (
@@ -269,27 +303,27 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
               <ChevronRight className="w-3.5 h-3.5 text-[#18181b]" />
             )}
             <Sparkles className="w-3.5 h-3.5 text-[#0d9488]" />
-            <span className="text-xs font-extrabold text-[#18181b]">
+            <span className="text-sm font-extrabold text-[#18181b]">
               Optional Guidance
             </span>
           </div>
 
-          <span className="text-[10px] text-[#666666] font-mono">
+          <span className="text-xs text-[#666666] font-mono">
             {customGuidance.trim() ? 'Directives Configured' : 'None (Click to add)'}
           </span>
         </button>
 
         {showGuidance && (
           <div className="px-3.5 pb-2.5 pt-1 border-t border-[#e5e5e5] bg-[#fffdf8] space-y-1.5 animate-in fade-in duration-150">
-            <p className="text-[11px] text-[#666666]">
-              Steer the agent's research and code generation strategy before decomposition:
+            <p className="text-xs text-[#555555]">
+              Steer the agent's research and code generation strategy:
             </p>
             <textarea
               rows={2}
               value={customGuidance}
               onChange={(e) => setCustomGuidance(e.target.value)}
-              placeholder="E.g., Ensure backward compatibility with existing RSA keys..."
-              className="w-full bg-white border border-[#18181b] rounded-md p-2 text-xs text-[#18181b] focus:outline-none focus:border-[#0d9488]"
+              placeholder="E.g., Ensure backward compatibility with existing configuration..."
+              className="w-full bg-white border border-[#18181b] rounded-md p-2 text-sm text-[#18181b] focus:outline-none focus:border-[#0d9488]"
             />
           </div>
         )}
@@ -300,20 +334,20 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full px-3.5 py-2 flex items-center justify-between cursor-pointer hover:bg-[#fffdf8] transition text-left"
+          className="w-full px-3.5 py-2.5 flex items-center justify-between cursor-pointer hover:bg-[#fffdf8] transition text-left"
         >
           <div className="flex items-center gap-2">
             {showAdvanced ? (
-              <ChevronDown className="w-3.5 h-3.5 text-[#18181b]" />
+              <ChevronDown className="w-4 h-4 text-[#18181b]" />
             ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-[#18181b]" />
+              <ChevronRight className="w-4 h-4 text-[#18181b]" />
             )}
-            <span className="text-xs font-extrabold text-[#18181b]">
+            <span className="text-sm font-extrabold text-[#18181b]">
               Advanced Settings &amp; Personal Credentials
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-[10px] font-mono">
+          <div className="flex items-center gap-2 text-xs font-mono">
             <span className="text-[#666666]">Retry: {retryCap}</span>
             <span className="text-[#666666]">·</span>
             <span className="text-[#666666]">
@@ -321,24 +355,24 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
             </span>
             <span className="text-[#666666]">·</span>
             <span className="text-[#0d9488] font-bold">
-              {githubToken ? 'Custom Token' : 'Server Default'}
+              {githubUsername ? `@${githubUsername}` : githubToken ? 'Connected' : 'Not Set'}
             </span>
           </div>
         </button>
 
         {showAdvanced && (
-          <div className="p-3.5 border-t border-[#e5e5e5] bg-[#fffdf8] grid grid-cols-1 md:grid-cols-2 gap-3 animate-in fade-in duration-150">
+          <div className="p-3.5 border-t border-[#e5e5e5] bg-[#fffdf8] grid grid-cols-1 md:grid-cols-2 gap-3.5 animate-in fade-in duration-150">
             {/* Panel A: Execution Policies */}
             <div className="space-y-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#18181b]">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-[#18181b]">
                 Execution Policies
               </span>
 
               {/* Policy 1: Auto-open PR */}
-              <div className="p-2 rounded-lg border border-[#e5e5e5] bg-white flex items-center justify-between text-xs">
+              <div className="p-2.5 rounded-lg border border-[#e5e5e5] bg-white flex items-center justify-between text-xs sm:text-sm">
                 <div>
                   <p className="font-bold text-[#18181b]">Auto-Open Pull Request</p>
-                  <p className="text-[10px] text-[#666666]">Requires manual sign-off when off</p>
+                  <p className="text-xs text-[#666666]">Requires manual sign-off when off</p>
                 </div>
                 <button
                   type="button"
@@ -356,30 +390,30 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
               </div>
 
               {/* Policy 2: Retry Cap */}
-              <div className="p-2 rounded-lg border border-[#e5e5e5] bg-white flex items-center justify-between text-xs">
+              <div className="p-2.5 rounded-lg border border-[#e5e5e5] bg-white flex items-center justify-between text-xs sm:text-sm">
                 <div>
                   <p className="font-bold text-[#18181b]">
                     {safeLabTitle} Retry Limit{safeLabTech ? ` (${safeLabTech})` : ''}
                   </p>
-                  <p className="text-[10px] text-[#666666]">Max self-healing test loops</p>
+                  <p className="text-xs text-[#666666]">Max self-healing test loops</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setRetryCap(Math.max(1, retryCap - 1))}
-                    className="w-5 h-5 rounded border border-[#18181b] bg-[#fffdf8] flex items-center justify-center font-bold cursor-pointer text-xs"
+                    className="w-6 h-6 rounded border border-[#18181b] bg-[#fffdf8] flex items-center justify-center font-bold cursor-pointer text-xs"
                   >
-                    <Minus className="w-2.5 h-2.5" />
+                    <Minus className="w-3 h-3" />
                   </button>
-                  <span className="w-5 text-center font-mono font-bold text-xs">
+                  <span className="w-6 text-center font-mono font-bold text-xs sm:text-sm">
                     {retryCap}
                   </span>
                   <button
                     type="button"
                     onClick={() => setRetryCap(Math.min(5, retryCap + 1))}
-                    className="w-5 h-5 rounded border border-[#18181b] bg-[#fffdf8] flex items-center justify-center font-bold cursor-pointer text-xs"
+                    className="w-6 h-6 rounded border border-[#18181b] bg-[#fffdf8] flex items-center justify-center font-bold cursor-pointer text-xs"
                   >
-                    <Plus className="w-2.5 h-2.5" />
+                    <Plus className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -388,18 +422,14 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
             {/* Panel B: GitHub Secret */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#18181b] flex items-center gap-1">
-                  <Key className="w-3 h-3 text-[#0d9488]" />
-                  GitHub Secret (Token)
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#18181b] flex items-center gap-1">
+                  <Key className="w-3.5 h-3.5 text-[#0d9488]" />
+                  GitHub Token
                 </span>
-                <span className="text-[10px] font-mono text-[#0d9488] font-bold">
-                  {githubUsername ? `● @${githubUsername}` : githubToken ? '● Custom Secret' : 'Server Default'}
+                <span className="text-xs font-mono text-[#0d9488] font-bold">
+                  {githubUsername ? `● @${githubUsername}` : githubToken ? '● Connected' : 'Not Set'}
                 </span>
               </div>
-
-              <p className="text-[10px] text-[#666666]">
-                Stored locally in browser. Uses GitHub Secret to authenticate repository and open PRs.
-              </p>
 
               <div className="flex items-center gap-1.5 pt-0.5">
                 <input
@@ -407,12 +437,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
                   value={githubToken}
                   onChange={(e) => handleTokenChange(e.target.value)}
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                  className="flex-1 bg-white border border-[#18181b] rounded px-2 py-1 text-xs font-mono text-[#18181b] focus:outline-none"
+                  className="flex-1 bg-white border border-[#18181b] rounded px-2.5 py-1.5 text-xs font-mono text-[#18181b] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
-                  className="px-2 py-1 rounded border border-[#18181b] bg-white text-xs font-bold hover:bg-[#fffdf8] transition cursor-pointer"
+                  className="px-2.5 py-1.5 rounded border border-[#18181b] bg-white text-xs font-bold hover:bg-[#fffdf8] transition cursor-pointer"
                 >
                   {showToken ? 'Hide' : 'Show'}
                 </button>
@@ -420,13 +450,25 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => handleTokenChange('')}
-                    className="px-2 py-1 rounded border border-[#e5e5e5] text-[#666666] hover:text-[#d31611] text-xs font-bold cursor-pointer"
+                    className="px-2.5 py-1.5 rounded border border-[#e5e5e5] text-[#666666] hover:text-[#d31611] text-xs font-bold cursor-pointer"
                     title="Clear token"
                   >
                     Clear
                   </button>
                 )}
               </div>
+
+              {onOpenSecretModal && (
+                <div className="flex items-center justify-end text-xs pt-0.5">
+                  <button
+                    type="button"
+                    onClick={onOpenSecretModal}
+                    className="text-[#0d9488] font-bold hover:underline cursor-pointer"
+                  >
+                    Configure in Modal &rarr;
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -435,37 +477,43 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
       {/* 5. Minimal Launch Action Strip */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         {/* Readiness Indicator */}
-        <div className="flex items-center gap-2 text-xs">
-          {isBlockedRepo ? (
-            <div className="flex items-center gap-1.5 text-[#d31611] font-bold">
-              <AlertCircle className="w-4 h-4" />
-              <span>Restricted Repository: Security Gate will block.</span>
+        <div className="flex items-center gap-2 text-xs sm:text-sm">
+          {!hasSecret ? (
+            <div className="flex items-center gap-1.5 text-[#d97706] font-bold">
+              <Key className="w-4 h-4" />
+              <span>GitHub Secret Required</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-[#0d9488] font-bold">
               <ShieldCheck className="w-4 h-4" />
-              <span>Sandboxes &amp; LLM Gateway Ready</span>
+              <span>Ready · @{githubUsername || 'token set'}</span>
             </div>
           )}
         </div>
 
         {/* Start Button */}
-        <button
-          type="button"
-          onClick={handleStart}
-          disabled={loading}
-          className={`py-2 px-7 text-center text-xs font-black transition cursor-pointer shadow-[2px_2px_0px_#18181b] ${
-            isBlockedRepo ? 'btn-warm opacity-80' : 'btn-cta'
-          }`}
-        >
-          {loading ? (
-            'Dispatching autonomous agents...'
-          ) : isBlockedRepo ? (
-            `Test ${secGateTitle} (Will Block)`
-          ) : (
-            'Start Autonomous Run \u2192'
-          )}
-        </button>
+        {!hasSecret ? (
+          <button
+            type="button"
+            onClick={onOpenSecretModal}
+            className="py-2.5 px-8 text-center text-sm font-black transition cursor-pointer shadow-[2px_2px_0px_#18181b] bg-[#ebdbb7] text-[#18181b] border-2 border-[#18181b] hover:bg-[#d97706] hover:text-white"
+          >
+            Insert GitHub Secret to Run &rarr;
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={loading || !isValidUrl}
+            className={`py-2.5 px-8 text-center text-sm font-black transition cursor-pointer shadow-[2px_2px_0px_#18181b] ${
+              !isValidUrl
+                ? 'bg-[#e5e5e5] text-[#888888] border-2 border-[#888888] cursor-not-allowed shadow-none'
+                : 'btn-cta'
+            }`}
+          >
+            {loading ? 'Dispatching autonomous agents...' : 'Start Autonomous Run \u2192'}
+          </button>
+        )}
       </div>
     </div>
   )

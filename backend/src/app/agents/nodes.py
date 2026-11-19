@@ -151,7 +151,11 @@ async def issue_analysis_node(state: SWEState) -> Dict[str, Any]:
     if match and repo:
         try:
             issue_id = int(match.group(1))
-            issue_data = fetch_github_issue.invoke({"repo": repo, "issue_number": issue_id})
+            issue_data = fetch_github_issue.invoke({
+                "repo": repo,
+                "issue_number": issue_id,
+                "github_token": state.get("github_token") or "",
+            })
             if issue_data and isinstance(issue_data, dict) and issue_data.get("title"):
                 analysis = (
                     f"Issue Analysis (GitHub #{issue_id}): '{issue_data['title']}'. "
@@ -359,9 +363,13 @@ async def pr_agent_node(state: SWEState) -> Dict[str, Any]:
         f"### Risk Score: {state.get('risk_score', 0.0)}"
     )
 
-    pr_url = create_pull_request.invoke(
-        {"repo": repo, "title": title, "head_branch": f"agentgate-fix-{state.get('thread_id', '1')}", "body": body}
-    )
+    pr_url = create_pull_request.invoke({
+        "repo": repo,
+        "title": title,
+        "head_branch": f"agentgate-fix-{state.get('thread_id', '1')}",
+        "body": body,
+        "github_token": state.get("github_token") or "",
+    })
 
     return {
         "pr_url": pr_url,

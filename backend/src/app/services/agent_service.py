@@ -68,6 +68,7 @@ class AgentService:
             "repo": clean_repo,
             "issue_title": issue_title or "Resolve GitHub Issue",
             "issue_description": issue_description or "Autonomous bug resolution request",
+            "github_token": github_token,
             "test_attempts": 0,
             "max_test_attempts": 3,
             "risk_score": 0.0,
@@ -102,7 +103,41 @@ class AgentService:
 
             # Stream graph updates node by node
             async for chunk in graph.astream(state_input, config=config, stream_mode="updates"):
+                # Handle possible tuple chunks from subgraphs or namespaced updates
+                if isinstance(chunk, tuple):
+                    if len(chunk) == 2 and isinstance(chunk[1], dict):
+                        chunk = chunk[1]
+                    else:
+                        continue
+
+                if not isinstance(chunk, dict):
+                    continue
+
                 for node_name, update in chunk.items():
+                    # Handle LangGraph interrupts before hitl
+                    if node_name == "__interrupt__":
+                        metadata = await get_run_metadata(thread_id)
+                        if metadata:
+                            metadata.status = "paused_hitl"
+                            await save_run_metadata(metadata)
+                        await queue.put({
+                            "event": "hitl_paused",
+                            "data": {
+                                "thread_id": thread_id,
+                                "status": "paused_hitl",
+                                "message": "Human approval required. Execution paused for sign-off.",
+                            },
+                        })
+                        continue
+
+                    # Safe handling for non-dict node updates
+                    if not isinstance(update, dict):
+                        if isinstance(update, (list, tuple)) and len(update) > 0 and isinstance(update[0], dict):
+                            update = update[0]
+                        else:
+                            logger.debug("Skipping non-dict chunk update for node %s: %s", node_name, type(update))
+                            continue
+
                     event_payload = {
                         "event": "node_update",
                         "data": {

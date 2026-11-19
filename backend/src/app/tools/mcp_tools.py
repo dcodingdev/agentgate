@@ -12,20 +12,26 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def fetch_github_issue(repo: str, issue_number: int) -> Dict[str, Any]:
+def fetch_github_issue(repo: str, issue_number: int, github_token: str = "") -> Dict[str, Any]:
     """Fetch issue details and discussions via GitHub MCP."""
     client = get_mcp_client()
-    return client.call_tool_sync("github", "get_issue", {"repo": repo, "issue_id": issue_number})
+    args: Dict[str, Any] = {"repo": repo, "issue_id": issue_number}
+    if github_token:
+        args["github_token"] = github_token
+    return client.call_tool_sync("github", "get_issue", args)
 
 
 @tool
-def create_pull_request(repo: str, title: str, head_branch: str, body: str) -> str:
+def create_pull_request(repo: str, title: str, head_branch: str, body: str, github_token: str = "") -> str:
     """Create a pull request with the verified patch on GitHub."""
     client = get_mcp_client()
+    args: Dict[str, Any] = {"repo": repo, "title": title, "head": head_branch, "body": body}
+    if github_token:
+        args["github_token"] = github_token
     res = client.call_tool_sync(
         "github",
         "create_pull_request",
-        {"repo": repo, "title": title, "head": head_branch, "body": body},
+        args,
     )
     return res.get("pr_url", f"https://github.com/{repo}/pull/mock-pr")
 

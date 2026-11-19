@@ -1,10 +1,7 @@
 export type ScreenId =
   | 'setup'
   | 'live-sandbox'
-  | 'every-stage'
   | 'approval-gate'
-  | 'clarification'
-  | 'blocked'
   | 'finished'
   | 'policies'
   | 'audit'
