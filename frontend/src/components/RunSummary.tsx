@@ -64,7 +64,7 @@ export const RunSummary: React.FC<RunSummaryProps> = ({ runState, onRefresh }) =
         <div className="bg-[#fffdf8] border-2 border-[#18181b] rounded-lg p-3 shadow-[1px_1px_0px_#18181b]">
           <span className="text-[10px] font-bold text-[#666666] uppercase tracking-wider">Repository</span>
           <p className="text-xs font-bold text-[#18181b] truncate mt-0.5">
-            {metadata?.repo || values?.repo || 'priya/shop-api'}
+            {metadata?.repo || values?.repo || 'Target Repository'}
           </p>
         </div>
 

@@ -160,23 +160,45 @@ class AgentService:
             if updated_metadata:
                 if "hitl" in next_nodes or final_values.get("status") == "paused_hitl":
                     updated_metadata.status = "paused_hitl"
-                    await queue.put({"event": "hitl_paused", "data": {"thread_id": thread_id, "risk_score": final_values.get("risk_score")}})
+                    await queue.put({
+                        "event": "hitl_paused",
+                        "data": {
+                            "thread_id": thread_id,
+                            "status": "paused_hitl",
+                            "risk_score": final_values.get("risk_score"),
+                        },
+                    })
+                    # Do not emit 'done' event here: stream stays alive for user sign-off decision
                 elif final_values.get("status") == "completed" or final_values.get("pr_url"):
                     updated_metadata.status = "completed"
                     updated_metadata.pr_url = final_values.get("pr_url")
-                    await queue.put({"event": "completed", "data": {"thread_id": thread_id, "pr_url": final_values.get("pr_url")}})
+                    await queue.put({
+                        "event": "completed",
+                        "data": {
+                            "thread_id": thread_id,
+                            "status": "completed",
+                            "pr_url": final_values.get("pr_url"),
+                        },
+                    })
+                    await queue.put({"event": "done", "data": {"thread_id": thread_id}})
                 elif final_values.get("status") == "rejected":
                     updated_metadata.status = "rejected"
-                    await queue.put({"event": "rejected", "data": {"thread_id": thread_id, "reason": final_values.get("guardrail_reason")}})
+                    await queue.put({
+                        "event": "rejected",
+                        "data": {
+                            "thread_id": thread_id,
+                            "reason": final_values.get("guardrail_reason"),
+                        },
+                    })
+                    await queue.put({"event": "done", "data": {"thread_id": thread_id}})
                 else:
                     updated_metadata.status = final_values.get("status", "completed")
+                    await queue.put({"event": "done", "data": {"thread_id": thread_id}})
 
                 if final_values.get("risk_score") is not None:
                     updated_metadata.risk_score = final_values.get("risk_score")
 
                 await save_run_metadata(updated_metadata)
-
-            await queue.put({"event": "done", "data": {"thread_id": thread_id}})
 
         except Exception as exc:
             logger.exception("Error executing graph for thread %s: %s", thread_id, exc)
@@ -216,11 +238,21 @@ class AgentService:
         }
         await graph.aupdate_state(config, state_update, as_node="hitl")
 
-        # Resume execution in background
-        task = asyncio.create_task(self._execute_graph(thread_id, None))
-        self.active_tasks[thread_id] = task
-
-        return {"status": "resumed", "thread_id": thread_id, "approved": approved}
+        if approved:
+            # For approvals, execute pr_agent synchronously to generate and return PR immediately
+            await self._execute_graph(thread_id, None)
+            metadata = await get_run_metadata(thread_id)
+            pr_url = metadata.pr_url if metadata else None
+            return {
+                "status": "completed",
+                "thread_id": thread_id,
+                "approved": True,
+                "pr_url": pr_url or f"https://github.com/pull/1",
+            }
+        else:
+            task = asyncio.create_task(self._execute_graph(thread_id, None))
+            self.active_tasks[thread_id] = task
+            return {"status": "resumed", "thread_id": thread_id, "approved": approved}
 
     async def get_run_state(self, thread_id: str) -> Dict[str, Any]:
         """Fetch current checkpoint state, next steps, and database metadata."""

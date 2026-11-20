@@ -32,15 +32,19 @@ class MultiServerMCPClient:
 
         # 1. GitHub MCP
         if self.settings.github_token:
-            logger.info("Configured GitHub MCP integration.")
+            logger.info("Configured GitHub MCP integration via environment.")
             self.connected_servers["github"] = {
                 "status": "connected",
                 "type": "github",
                 "capabilities": ["issues", "pull_requests", "commits"],
             }
         else:
-            logger.warning("GITHUB_TOKEN not provided; GitHub MCP in mock mode.")
-            self.connected_servers["github"] = {"status": "mock", "type": "github"}
+            logger.info("GitHub MCP initialized (tokens provided dynamically via UI).")
+            self.connected_servers["github"] = {
+                "status": "connected",
+                "type": "github",
+                "capabilities": ["issues", "pull_requests", "commits"],
+            }
 
         # 2. Filesystem MCP
         self.connected_servers["filesystem"] = {
@@ -91,6 +95,7 @@ class MultiServerMCPClient:
             )
 
             if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
+                # pyrefly: ignore[missing-import]
                 import httpx
 
                 headers = {
@@ -115,7 +120,37 @@ class MultiServerMCPClient:
                                     "body": data.get("body", ""),
                                     "labels": [l.get("name") for l in data.get("labels", []) if isinstance(l, dict)],
                                 }
-                            logger.warning("GitHub API get_issue sync returned %s: %s", resp.status_code, resp.text)
+                            if resp.status_code == 401:
+                                # Token expired or invalid: retry unauthenticated for public repositories
+                                logger.info(
+                                    "GitHub token returned 401 Bad credentials. Retrying unauthenticated for public repo %s...",
+                                    clean_repo,
+                                )
+                                pub_headers = {
+                                    "Accept": "application/vnd.github.v3+json",
+                                    "User-Agent": "AgentGate-SWE-Agent",
+                                }
+                                pub_resp = client.get(
+                                    f"https://api.github.com/repos/{clean_repo}/issues/{issue_id}",
+                                    headers=pub_headers,
+                                )
+                                if pub_resp.status_code == 200:
+                                    data = pub_resp.json()
+                                    return {
+                                        "issue_id": data.get("number", issue_id),
+                                        "title": data.get("title", ""),
+                                        "body": data.get("body", ""),
+                                        "labels": [l.get("name") for l in data.get("labels", []) if isinstance(l, dict)],
+                                    }
+                                if pub_resp.status_code == 403:
+                                    logger.warning(
+                                        "GitHub API rate limit reached (403). Using user-provided issue details for '%s'.",
+                                        arguments.get("issue_title") or clean_repo,
+                                    )
+                                else:
+                                    logger.warning("GitHub API unauthenticated get_issue returned %s: %s", pub_resp.status_code, pub_resp.text)
+                            else:
+                                logger.warning("GitHub API get_issue sync returned %s: %s", resp.status_code, resp.text)
                     except Exception as exc:
                         logger.warning("GitHub API get_issue sync error (%s), using fallback.", exc)
 
@@ -169,10 +204,12 @@ class MultiServerMCPClient:
                         logger.warning("GitHub API create_pull_request sync error (%s), using fallback.", exc)
 
             if tool_name == "get_issue":
+                fallback_title = arguments.get("issue_title") or arguments.get("title") or "Fix memory leak in session loop"
+                fallback_desc = arguments.get("issue_description") or arguments.get("body") or "Detailed description of the issue."
                 return {
                     "issue_id": arguments.get("issue_id", 1),
-                    "title": "Fix memory leak in session loop",
-                    "body": "Detailed description of the issue.",
+                    "title": fallback_title,
+                    "body": fallback_desc,
                     "labels": ["bug"],
                 }
             elif tool_name == "create_pull_request":
@@ -225,6 +262,7 @@ class MultiServerMCPClient:
 
             if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
                 import base64
+                # pyrefly: ignore[missing-import]
                 import httpx
 
                 headers = {
@@ -250,7 +288,38 @@ class MultiServerMCPClient:
                                     "body": data.get("body", ""),
                                     "labels": [l.get("name") for l in data.get("labels", []) if isinstance(l, dict)],
                                 }
-                            logger.warning("GitHub API get_issue returned %s: %s", resp.status_code, resp.text)
+                            if resp.status_code == 401:
+                                # Token expired or invalid: retry unauthenticated for public repositories
+                                logger.info(
+                                    "GitHub token returned 401 Bad credentials. Retrying unauthenticated for public repo %s...",
+                                    clean_repo,
+                                )
+                                pub_headers = {
+                                    "Accept": "application/vnd.github.v3+json",
+                                    "User-Agent": "AgentGate-SWE-Agent",
+                                }
+                                pub_resp = await client.get(
+                                    f"https://api.github.com/repos/{clean_repo}/issues/{issue_id}",
+                                    headers=pub_headers,
+                                    timeout=15.0,
+                                )
+                                if pub_resp.status_code == 200:
+                                    data = pub_resp.json()
+                                    return {
+                                        "issue_id": data.get("number", issue_id),
+                                        "title": data.get("title", ""),
+                                        "body": data.get("body", ""),
+                                        "labels": [l.get("name") for l in data.get("labels", []) if isinstance(l, dict)],
+                                    }
+                                if pub_resp.status_code == 403:
+                                    logger.warning(
+                                        "GitHub API rate limit reached (403). Using user-provided issue details for '%s'.",
+                                        arguments.get("issue_title") or clean_repo,
+                                    )
+                                else:
+                                    logger.warning("GitHub API unauthenticated get_issue returned %s: %s", pub_resp.status_code, pub_resp.text)
+                            else:
+                                logger.warning("GitHub API get_issue returned %s: %s", resp.status_code, resp.text)
                     except Exception as exc:
                         logger.warning("GitHub API get_issue error (%s), using fallback.", exc)
 
@@ -353,10 +422,12 @@ class MultiServerMCPClient:
                         logger.warning("GitHub API create_pull_request error (%s), using fallback.", exc)
 
             if tool_name == "get_issue":
+                fallback_title = arguments.get("issue_title") or arguments.get("title") or "Fix memory leak in session loop"
+                fallback_desc = arguments.get("issue_description") or arguments.get("body") or "Detailed description of the issue."
                 return {
                     "issue_id": arguments.get("issue_id", 1),
-                    "title": "Fix memory leak in session loop",
-                    "body": "Detailed description of the issue.",
+                    "title": fallback_title,
+                    "body": fallback_desc,
                     "labels": ["bug"],
                 }
             elif tool_name == "create_pull_request":

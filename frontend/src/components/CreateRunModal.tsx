@@ -12,8 +12,8 @@ interface CreateRunModalProps {
 const PRESETS = [
   {
     name: 'Token Expiration Bug',
-    repo: 'priya/shop-api',
-    issue_url: 'https://github.com/priya/shop-api/issues/60',
+    repo: 'owner/repo',
+    issue_url: 'https://github.com/owner/repo/issues/1',
     title: 'Login tokens never expire',
     description: 'System fails to validate UTC expiration timestamps during session verification.',
   },
@@ -130,7 +130,7 @@ export const CreateRunModal: React.FC<CreateRunModalProps> = ({ isOpen, onClose,
               required
               value={formData.repo}
               onChange={(e) => setFormData({ ...formData, repo: e.target.value })}
-              placeholder="priya/shop-api"
+              placeholder="owner/repository"
               className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
             />
           </div>
@@ -144,7 +144,7 @@ export const CreateRunModal: React.FC<CreateRunModalProps> = ({ isOpen, onClose,
               required
               value={formData.issue_url}
               onChange={(e) => setFormData({ ...formData, issue_url: e.target.value })}
-              placeholder="https://github.com/priya/shop-api/issues/60"
+              placeholder="https://github.com/owner/repository/issues/1"
               className="w-full bg-white border-2 border-[#18181b] rounded-md px-3 py-2 text-xs text-[#18181b] focus:outline-none focus:border-[#d31611]"
             />
           </div>

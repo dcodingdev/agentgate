@@ -5,7 +5,6 @@ import {
   Key,
   Minus,
   Plus,
-  ShieldCheck,
   Sparkles,
 } from 'lucide-react'
 import type { CreateRunRequest, TerminologyMode } from '../../types'
@@ -478,15 +477,10 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         {/* Readiness Indicator */}
         <div className="flex items-center gap-2 text-xs sm:text-sm">
-          {!hasSecret ? (
+          {!hasSecret && (
             <div className="flex items-center gap-1.5 text-[#d97706] font-bold">
               <Key className="w-4 h-4" />
               <span>GitHub Secret Required</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[#0d9488] font-bold">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Ready · @{githubUsername || 'token set'}</span>
             </div>
           )}
         </div>

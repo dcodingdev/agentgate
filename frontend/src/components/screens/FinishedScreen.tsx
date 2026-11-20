@@ -134,7 +134,7 @@ export const FinishedScreen: React.FC<FinishedScreenProps> = ({
           <div>
             <div className="flex items-center justify-between pb-2.5 border-b border-[#e5e5e5]">
               <span className="text-xs font-extrabold text-[#18181b] font-geist">
-                Execution Audit &amp; Cleanup
+                Execution Summary &amp; Cleanup
               </span>
               <span className="text-[10px] font-bold text-[#666666]">
                 Total: 72s

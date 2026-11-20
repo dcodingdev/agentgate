@@ -1,12 +1,19 @@
 import React from 'react'
-import { Lock, Shield, Sliders } from 'lucide-react'
+import { CheckCircle2, Key, Lock, Shield, Sliders } from 'lucide-react'
 import type { TerminologyMode } from '../../types'
 
 interface PoliciesScreenProps {
   terminologyMode?: TerminologyMode
+  githubUsername?: string
+  activeRepo?: string
+  onOpenSecretModal?: () => void
 }
 
-export const PoliciesScreen: React.FC<PoliciesScreenProps> = () => {
+export const PoliciesScreen: React.FC<PoliciesScreenProps> = ({
+  githubUsername = '',
+  activeRepo = '',
+  onOpenSecretModal,
+}) => {
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
       {/* Header */}
@@ -16,49 +23,94 @@ export const PoliciesScreen: React.FC<PoliciesScreenProps> = () => {
             Repositories &amp; Governance Policies
           </h1>
           <p className="text-sm text-[#555555] mt-0.5 font-medium">
-            Organizational guardrails, retry limits, sensitive path definitions, and approval ceilings.
+            Real-time repository allowlists, branch protection, sensitive path gates, and autonomous execution ceilings.
           </p>
         </div>
+
+        {onOpenSecretModal && (
+          <button
+            type="button"
+            onClick={onOpenSecretModal}
+            className="btn-outline-dark text-xs py-1.5 px-3 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <Key className="w-3.5 h-3.5 text-[#d31611]" />
+            <span>Manage GitHub Secret</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-        {/* LEFT COLUMN: Organization Allowlist & Path Protections (7 cols) */}
+        {/* LEFT COLUMN: Real Organization Allowlist & Path Protections (7 cols) */}
         <section className="lg:col-span-7 card-canvas-elevated p-4 flex flex-col justify-between h-[520px]">
           <div>
             <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-[#0d9488]" />
                 <h2 className="text-xs font-extrabold text-[#18181b]">
-                  Authorized Repository Allowlist (ALLOWED_REPOS)
+                  Authorized Repository Allowlist
                 </h2>
               </div>
-              <span className="text-[10px] text-[#666666] font-mono">3 configured</span>
+              <span className="text-[10px] text-[#666666] font-mono">
+                {activeRepo || githubUsername ? 'Dynamic Token Scope' : 'Token Authorization'}
+              </span>
             </div>
 
             <div className="space-y-2 mt-3 text-xs">
-              <div className="p-3 rounded-lg border-2 border-[#18181b] bg-[#fffdf8] flex items-center justify-between shadow-[2px_2px_0px_#18181b]">
-                <div>
-                  <p className="font-extrabold text-[#18181b]">core-api</p>
-                  <p className="text-[11px] text-[#666666]">Primary Backend Service · Signature &amp; API handling</p>
+              {/* Dynamic Target Repository if active */}
+              {activeRepo && (
+                <div className="p-3 rounded-lg border-2 border-[#18181b] bg-[#fffdf8] flex items-center justify-between shadow-[2px_2px_0px_#18181b]">
+                  <div className="space-y-0.5">
+                    <p className="font-extrabold text-[#18181b] font-mono">{activeRepo}</p>
+                    <p className="text-[11px] text-[#666666]">Active Target · Ephemeral isolated sandbox attached</p>
+                  </div>
+                  <span className="badge-teal text-[10px] font-bold">Active · Authorized</span>
                 </div>
-                <span className="badge-teal text-[10px]">Active · Monitored</span>
+              )}
+
+              {/* Dynamic Connected User Account Allowlist */}
+              {githubUsername ? (
+                <div className="p-3 rounded-lg border-2 border-[#18181b] bg-white flex items-center justify-between shadow-[1px_1px_0px_#18181b]">
+                  <div className="space-y-0.5">
+                    <p className="font-extrabold text-[#18181b] font-mono">{githubUsername}/*</p>
+                    <p className="text-[11px] text-[#666666]">
+                      Personal GitHub repositories authenticated via user PAT
+                    </p>
+                  </div>
+                  <span className="badge-warm text-[10px] font-bold">Scoped by Token</span>
+                </div>
+              ) : null}
+
+              {/* Token Dynamic Policy Card */}
+              <div className="p-3 rounded-lg border border-[#18181b] bg-[#fffdf8] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#18181b] flex items-center gap-1.5 font-mono">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
+                    ALLOWED_REPOS=["*"]
+                  </span>
+                  <span className="badge-teal text-[10px]">Policy Dynamic</span>
+                </div>
+                <p className="text-[11px] text-[#666666] leading-relaxed">
+                  Zero mock repos. All repositories are authenticated strictly through your personal GitHub Secret Key. Only repositories where your token holds write permissions can be modified.
+                </p>
               </div>
 
-              <div className="p-3 rounded-lg border-2 border-[#18181b] bg-white flex items-center justify-between">
-                <div>
-                  <p className="font-extrabold text-[#18181b]">priya/shop-api</p>
-                  <p className="text-[11px] text-[#666666]">E-commerce API · session handling</p>
+              {!githubUsername && !activeRepo && (
+                <div className="p-4 rounded-lg border-2 border-dashed border-[#d4d4d8] bg-[#f4f4f5] text-center space-y-2">
+                  <p className="text-xs font-bold text-[#18181b]">No GitHub Token Connected</p>
+                  <p className="text-[11px] text-[#666666] max-w-sm mx-auto">
+                    Provide your personal access token in Setup or click below to authorize your private or organizational repositories.
+                  </p>
+                  {onOpenSecretModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenSecretModal}
+                      className="btn-cta text-xs py-1 px-3 cursor-pointer"
+                    >
+                      Connect GitHub Token &rarr;
+                    </button>
+                  )}
                 </div>
-                <span className="badge-warm text-[10px]">Allowed · Test Repo</span>
-              </div>
-
-              <div className="p-3 rounded-lg border-2 border-[#e5e5e5] bg-slate-50 flex items-center justify-between opacity-80">
-                <div>
-                  <p className="font-extrabold text-[#666666]">org/internal-tools</p>
-                  <p className="text-[11px] text-[#666666]">Internal utilities (Restricted from autonomous execution)</p>
-                </div>
-                <span className="badge-red text-[10px]">Blocked by Policy</span>
-              </div>
+              )}
             </div>
           </div>
 

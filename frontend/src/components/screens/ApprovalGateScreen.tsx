@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2,
   CheckSquare,
@@ -8,8 +8,13 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react'
-import type { TerminologyMode } from '../../types'
+import type {
+  RunStateResponse,
+  StreamEventPayload,
+  TerminologyMode,
+} from '../../types'
 import { formatDualTerm } from '../../utils/terminology'
+import { PipelineStepTracker } from '../PipelineStepTracker'
 
 interface ApprovalGateScreenProps {
   onApprove?: () => void
@@ -20,6 +25,13 @@ interface ApprovalGateScreenProps {
   issueTitle?: string
   hasPendingApproval?: boolean
   onStartNewRun?: () => void
+  events?: StreamEventPayload[]
+  sandboxId?: string
+  currentAttempt?: number
+  maxAttempts?: number
+  elapsedSeconds?: number
+  runState?: RunStateResponse | null
+  onNavigateToSandbox?: () => void
 }
 
 export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
@@ -31,6 +43,11 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   issueTitle = '',
   hasPendingApproval = false,
   onStartNewRun,
+  events = [],
+  sandboxId = 'sbx-active',
+  currentAttempt = 1,
+  maxAttempts = 3,
+  runState,
 }) => {
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified')
   const [showSandboxEditor, setShowSandboxEditor] = useState<boolean>(false)
@@ -38,6 +55,16 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   const [feedback, setFeedback] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [submittedStatus, setSubmittedStatus] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+
+  const terminalRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll terminal container when opened
+  useEffect(() => {
+    if (showSandboxEditor && terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    }
+  }, [showSandboxEditor, events.length])
 
   // Dual-vocabulary labels
   const { primary: signOffTitle } = formatDualTerm(
@@ -57,6 +84,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
   )
 
   const handleApprove = () => {
+    setIsSubmitting(true)
     setSubmittedStatus(
       'Approved! Dispatching PR creation to open upstream GitHub Pull Request...'
     )
@@ -84,6 +112,24 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
     setSubmittedStatus('Execution terminated. Isolated sandbox environment purged.')
     if (onReject) onReject(feedback)
   }
+
+  // Derive candidate patch: use real patch if in state or events, otherwise fall back to clean RFC patch
+  const patchFromState = runState?.values?.patch_diff
+  const patchFromEvents = events.find(
+    (e) =>
+      typeof e.data?.message === 'string' &&
+      (e.data.message.includes('---') ||
+        e.data.message.includes('+++') ||
+        e.data.message.includes('@@'))
+  )?.data?.message
+
+  const candidatePatch = patchFromState || patchFromEvents || null
+
+  const riskScore =
+    runState?.risk_score ??
+    runState?.values?.risk_score ??
+    events.find((e) => typeof e.data?.risk_score === 'number')?.data?.risk_score ??
+    0.85
 
   if (!hasPendingApproval) {
     return (
@@ -132,7 +178,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
                 {signOffTitle} Required
               </h1>
               <span className="badge-red text-[10px]">
-                Risk Score: 0.85 (Threshold: 0.70)
+                Risk Score: {riskScore.toFixed(2)} (Threshold: 0.70)
               </span>
             </div>
             <p className="text-xs text-[#92400e] font-medium mt-0.5">
@@ -142,13 +188,22 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
         </div>
       </section>
 
+      {/* 2. Color-Coded Execution Pipeline Tracker (With Auto-Scroll to Active Step 07) */}
+      <PipelineStepTracker
+        events={events}
+        runStateStatus="paused_hitl"
+        currentAttempt={currentAttempt}
+        maxAttempts={maxAttempts}
+        terminologyMode={terminologyMode}
+      />
+
       {submittedStatus && (
         <div className="p-3 bg-[#ccfbf1] border-2 border-[#0d9488] rounded-lg text-xs font-bold text-[#0f766e] shadow-[2px_2px_0px_#0d9488]">
           {submittedStatus}
         </div>
       )}
 
-      {/* 2. Main 2-Column Review Workspace (7 cols Code Review + 5 cols Dossier & Action Dock) */}
+      {/* 3. Main 2-Column Review Workspace (7 cols Code Review + 5 cols Dossier & Action Dock) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* LEFT COLUMN: Code Review Split & Sandbox Terminal (7 cols) */}
         <section className="lg:col-span-7 card-canvas-elevated p-4 flex flex-col h-[540px]">
@@ -192,7 +247,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setShowSandboxEditor(!showSandboxEditor)}
-                className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fff4da] text-[#18181b] border border-[#18181b] flex items-center gap-1 shadow-xs hover:bg-[#ebdbb7] transition"
+                className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fff4da] text-[#18181b] border border-[#18181b] flex items-center gap-1 shadow-xs hover:bg-[#ebdbb7] transition cursor-pointer"
               >
                 <Terminal className="w-3 h-3 text-[#0d9488]" />
                 <span>{showSandboxEditor ? 'View Diff' : 'Edit in Sandbox'}</span>
@@ -202,20 +257,25 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
 
           {/* Subheader info */}
           <div className="h-7 flex items-center justify-between text-[11px] text-[#666666] font-mono shrink-0">
-            <span>RFC 8037 Ed25519 asymmetric verification</span>
+            <span>
+              {candidatePatch ? 'Verified Patch applied in container' : 'RFC 8037 Ed25519 asymmetric verification'}
+            </span>
             <span className="text-[#0d9488] font-bold">+18 lines / -4 lines</span>
           </div>
 
           {/* Code Viewer Container */}
           {showSandboxEditor ? (
-            <div className="flex-1 min-h-0 mt-1 bg-[#18181b] rounded-lg p-3 font-mono text-xs overflow-y-auto text-slate-200 border-2 border-[#18181b] space-y-2">
+            <div
+              ref={terminalRef}
+              className="flex-1 min-h-0 mt-1 bg-[#18181b] rounded-lg p-3 font-mono text-xs overflow-y-auto text-slate-200 border-2 border-[#18181b] space-y-2 select-text"
+            >
               <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px] text-slate-400">
-                <span>Interactive Sandbox Shell · tty0</span>
+                <span>Interactive Sandbox Shell · tty0 (Sandbox #{sandboxId})</span>
                 <span className="text-[#0d9488] font-bold">● Active Sandbox</span>
               </div>
               <div className="space-y-1 text-slate-300">
                 <div className="text-slate-500">
-                  # You can inspect or test changes directly in the container:
+                  # Ephemeral execution environment active at /repo:
                 </div>
                 <div>
                   <span className="text-[#0d9488] font-bold">$ </span>
@@ -224,10 +284,73 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
                 <div className="text-[#4ade80] text-[11px]">
                   tests/test_jwt.py::test_ed25519_signature PASSED [100%]
                 </div>
+
+                {events.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800 space-y-1">
+                    <div className="text-slate-500 text-[10px]"># Real-time Sandbox Execution Logs:</div>
+                    {events
+                      .filter((e) => e.data?.message)
+                      .slice(-6)
+                      .map((e, idx) => (
+                        <div key={idx} className="text-slate-300 text-[11px]">
+                          <span className="text-slate-500">[{e.data.node || 'sbx'}] </span>
+                          <span>{e.data.message}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
                 <div className="text-slate-500 pt-2">
                   # Sandbox modifications automatically sync with the review patch.
                 </div>
               </div>
+            </div>
+          ) : candidatePatch ? (
+            <div className="flex-1 min-h-0 mt-1 bg-[#18181b] rounded-lg p-3 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
+              <div className="text-slate-500 text-[10px] pb-1">
+                # Candidate Patch applied in Sandbox #{sandboxId}
+              </div>
+              {candidatePatch.split('\n').map((line: string, idx: number) => {
+                if (line.startsWith('+++') || line.startsWith('---')) {
+                  return (
+                    <div key={idx} className="text-[#60a5fa] text-[11px] font-bold">
+                      {line}
+                    </div>
+                  )
+                }
+                if (line.startsWith('@@')) {
+                  return (
+                    <div key={idx} className="text-slate-500 text-[11px]">
+                      {line}
+                    </div>
+                  )
+                }
+                if (line.startsWith('+')) {
+                  return (
+                    <div
+                      key={idx}
+                      className="text-[#4ade80] bg-[#4ade80]/15 px-1 rounded font-bold"
+                    >
+                      {line}
+                    </div>
+                  )
+                }
+                if (line.startsWith('-')) {
+                  return (
+                    <div
+                      key={idx}
+                      className="text-[#f87171] bg-[#f87171]/15 px-1 rounded font-bold"
+                    >
+                      {line}
+                    </div>
+                  )
+                }
+                return (
+                  <div key={idx} className="text-slate-400">
+                    {line}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="flex-1 min-h-0 mt-1 bg-[#18181b] rounded-lg p-3 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
@@ -238,7 +361,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
               <div className="text-[#60a5fa] text-[11px]">+++ b/src/auth/jwt_manager.py</div>
               <div className="text-slate-500 text-[11px]">@@ -54,8 +54,14 @@ def verify_jwt_signature(token: str, key):</div>
               <div className="text-slate-400">     header = jwt.get_unverified_header(token)</div>
-              
+
               {/* Inline Line Annotation */}
               <div className="p-1.5 rounded bg-[#0d9488]/20 border border-[#0d9488] text-[11px] my-1 text-teal-200 font-sans">
                 <span className="font-bold text-white">Line 56 Annotation: </span>
@@ -302,7 +425,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
               <div className="p-2 rounded-md bg-[#fffdf8] border border-[#e5e5e5] space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[#18181b]">3. Sandbox Isolation</span>
-                  <span className="text-[#0d9488] font-bold">Sealed</span>
+                  <span className="text-[#0d9488] font-bold">Sealed #{sandboxId}</span>
                 </div>
                 <p className="text-[10px] text-[#666666]">
                   Ephemeral isolated container with read-only filesystem; zero leaked credentials.
@@ -312,7 +435,7 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
               <div className="p-2 rounded-md bg-[#fff4da] border border-[#18181b] space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[#d31611]">4. Risk Evaluation</span>
-                  <span className="badge-amber text-[10px]">0.85 High Risk</span>
+                  <span className="badge-amber text-[10px]">{riskScore.toFixed(2)} High Risk</span>
                 </div>
                 <p className="text-[10px] text-[#18181b] font-medium">
                   Touches auth crypto; exceeds 0.70 threshold. Requires sign-off below.
@@ -392,14 +515,21 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
               </form>
             ) : (
               <div className="space-y-2">
-                {/* Primary Button: Approve and Open PR #61 */}
+                {/* Primary Button: Approve and Open GitHub PR */}
                 <button
                   type="button"
                   onClick={handleApprove}
-                  className="w-full btn-cta py-2.5 text-xs font-bold text-center flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={isSubmitting}
+                  className={`w-full btn-cta py-2.5 text-xs font-bold text-center flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#18181b] ${
+                    isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Approve and Open GitHub PR &rarr;</span>
+                  <span>
+                    {isSubmitting
+                      ? 'Opening Pull Request on GitHub...'
+                      : 'Approve and Open GitHub PR \u2192'}
+                  </span>
                 </button>
 
                 {/* Secondary Actions */}

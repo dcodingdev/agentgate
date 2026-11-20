@@ -33,7 +33,10 @@ def apply_patch(sandbox_id: str, patch_content: str, target_dir: str = "/repo") 
 
     # Sanitize patch content to prevent basic command injection if piped
     escaped_patch = patch_content.replace('"', '\\"')
-    cmd = f'cd {target_dir} && printf "%s" "{escaped_patch}" | git apply --whitespace=fix -'
+    cmd = (
+        f'([ -d "{target_dir}" ] || sudo mkdir -p "{target_dir}" && sudo chown -R $(id -u):$(id -g) "{target_dir}" 2>/dev/null || mkdir -p "{target_dir}" 2>/dev/null || true) && '
+        f'cd {target_dir} && printf "%s" "{escaped_patch}" | git apply --whitespace=fix -'
+    )
 
     result = run_command_sync(sandbox_id, cmd, timeout=60)
 
@@ -50,7 +53,10 @@ def run_tests(
     """Execute the test suite in the sandbox and return structured test metrics."""
     logger.info("Running tests in sandbox %s: %s", sandbox_id, test_command)
 
-    cmd = f"cd {target_dir} && {test_command}"
+    cmd = (
+        f'([ -d "{target_dir}" ] || sudo mkdir -p "{target_dir}" && sudo chown -R $(id -u):$(id -g) "{target_dir}" 2>/dev/null || mkdir -p "{target_dir}" 2>/dev/null || true) && '
+        f"cd {target_dir} && {test_command}"
+    )
 
     result = run_command_sync(sandbox_id, cmd, timeout=180)
 
@@ -81,6 +87,7 @@ def search_code(sandbox_id: str, query: str, target_dir: str = "/repo") -> str:
     # Sanitize query
     clean_query = query.replace("'", "").replace('"', "")
     cmd = (
+        f'([ -d "{target_dir}" ] || sudo mkdir -p "{target_dir}" && sudo chown -R $(id -u):$(id -g) "{target_dir}" 2>/dev/null || mkdir -p "{target_dir}" 2>/dev/null || true) && '
         f"cd {target_dir} && "
         f"(grep -rn --exclude-dir='.git' --exclude-dir='__pycache__' '{clean_query}' . 2>/dev/null | head -n 30 "
         f"|| echo 'No code matches found for {clean_query}')"
@@ -96,7 +103,10 @@ def read_repo_file(sandbox_id: str, file_path: str, target_dir: str = "/repo") -
     logger.info("Reading repository file in sandbox %s: %s", sandbox_id, file_path)
 
     clean_path = file_path.replace("..", "").lstrip("/")
-    cmd = f"cd {target_dir} && (head -n 200 '{clean_path}' 2>/dev/null || echo 'File not found: {clean_path}')"
+    cmd = (
+        f'([ -d "{target_dir}" ] || sudo mkdir -p "{target_dir}" && sudo chown -R $(id -u):$(id -g) "{target_dir}" 2>/dev/null || mkdir -p "{target_dir}" 2>/dev/null || true) && '
+        f"cd {target_dir} && (head -n 200 '{clean_path}' 2>/dev/null || echo 'File not found: {clean_path}')"
+    )
 
     result = run_command_sync(sandbox_id, cmd, timeout=30)
     return result.get("stdout") or result.get("stderr") or f"File not found: {clean_path}."

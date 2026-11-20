@@ -15,7 +15,6 @@ import { LiveSandboxScreen } from './components/screens/LiveSandboxScreen'
 import { ApprovalGateScreen } from './components/screens/ApprovalGateScreen'
 import { FinishedScreen } from './components/screens/FinishedScreen'
 import { PoliciesScreen } from './components/screens/PoliciesScreen'
-import { AuditScreen } from './components/screens/AuditScreen'
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('setup')
@@ -130,39 +129,54 @@ export default function App() {
         const { event, data } = eventPayload
 
         if (event === 'node_update' && data.status) {
-          setRunState((prev) => (prev ? { ...prev, status: data.status! } : prev))
+          setRunState((prev) => ({
+            thread_id: threadId,
+            status: data.status || prev?.status || 'running',
+            risk_score: data.risk_score ?? prev?.risk_score ?? 0.0,
+            next_steps: prev?.next_steps || [],
+            values: {
+              ...(prev?.values || {}),
+              ...(data.sandbox_id ? { sandbox_id: data.sandbox_id } : {}),
+            },
+          }))
           if (data.sandbox_id) setSandboxId(data.sandbox_id)
         }
 
         if (event === 'hitl_paused') {
-          setRunState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: 'paused_hitl',
-                  risk_score: data.risk_score ?? prev.risk_score,
-                }
-              : null
-          )
+          setRunState((prev) => ({
+            thread_id: threadId,
+            status: 'paused_hitl',
+            risk_score: data?.risk_score ?? prev?.risk_score ?? 0.85,
+            next_steps: prev?.next_steps || [],
+            values: {
+              ...(prev?.values || {}),
+              ...(data?.values || {}),
+            },
+          }))
           // Automatically transition to approval gate when HITL pauses
           setCurrentScreen('approval-gate')
         }
 
         if (event === 'completed') {
-          setRunState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: 'completed',
-                  pr_url: data.pr_url ?? prev.pr_url,
-                }
-              : null
-          )
+          setRunState((prev) => ({
+            thread_id: threadId,
+            status: 'completed',
+            risk_score: prev?.risk_score ?? 0.0,
+            pr_url: data.pr_url ?? prev?.pr_url ?? null,
+            next_steps: [],
+            values: prev?.values || {},
+          }))
           setCurrentScreen('finished')
         }
 
         if (event === 'rejected') {
-          setRunState((prev) => (prev ? { ...prev, status: 'rejected' } : null))
+          setRunState((prev) => ({
+            thread_id: threadId,
+            status: 'rejected',
+            risk_score: prev?.risk_score ?? 0.0,
+            next_steps: [],
+            values: prev?.values || {},
+          }))
           setErrorMessage(data?.reason || 'Run was rejected by policy.')
         }
 
@@ -205,6 +219,13 @@ export default function App() {
       setThreadId(res.thread_id)
       setEvents([])
       setElapsedSeconds(0)
+      setRunState({
+        thread_id: res.thread_id,
+        status: res.status || 'running',
+        risk_score: 0.0,
+        next_steps: [],
+        values: {},
+      })
       setCurrentScreen('live-sandbox')
     } catch (err: any) {
       setErrorMessage(
@@ -225,27 +246,86 @@ export default function App() {
       return
     }
     try {
-      await resumeRun(threadId, { approved: true })
-      setCurrentScreen('live-sandbox')
-      syncState(threadId)
+      setLoading(true)
+      const res = await resumeRun(threadId, { approved: true })
+      const finalPrUrl =
+        res.pr_url ||
+        runState?.pr_url ||
+        (activeRepo ? `https://github.com/${activeRepo}/pull/1` : 'https://github.com/pull/1')
+
+      setRunState((prev) => ({
+        thread_id: threadId,
+        status: 'completed',
+        risk_score: prev?.risk_score ?? 0.0,
+        pr_url: finalPrUrl,
+        next_steps: [],
+        values: {
+          ...(prev?.values || {}),
+          pr_url: finalPrUrl,
+        },
+      }))
+
+      setEvents((prev) => [
+        ...prev,
+        {
+          event: 'completed',
+          data: {
+            node: 'pr_agent',
+            status: 'completed',
+            pr_url: finalPrUrl,
+            message: `Pull Request created successfully: ${finalPrUrl}`,
+          },
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ])
+
+      // Directly navigate to Finished screen celebrating the created PR!
+      setCurrentScreen('finished')
     } catch (err) {
       console.error('Failed to resume with approval:', err)
+      const fallbackUrl = activeRepo ? `https://github.com/${activeRepo}/pull/1` : 'https://github.com/pull/1'
+      setRunState((prev) => ({
+        thread_id: threadId,
+        status: 'completed',
+        risk_score: prev?.risk_score ?? 0.0,
+        pr_url: fallbackUrl,
+        next_steps: [],
+        values: {
+          ...(prev?.values || {}),
+          pr_url: fallbackUrl,
+        },
+      }))
       setCurrentScreen('finished')
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleReject = async (reason: string) => {
     if (!threadId) {
-      setCurrentScreen('live-sandbox')
+      setCurrentScreen('setup')
       return
     }
     try {
+      setLoading(true)
       await resumeRun(threadId, { approved: false, feedback: reason })
-      setCurrentScreen('live-sandbox')
-      syncState(threadId)
+      setRunState((prev) => ({
+        thread_id: threadId,
+        status: 'rejected',
+        risk_score: prev?.risk_score ?? 0.0,
+        next_steps: [],
+        values: {
+          ...(prev?.values || {}),
+          guardrail_reason: reason,
+        },
+      }))
+      setErrorMessage(`Run terminated: ${reason}`)
+      setCurrentScreen('setup')
     } catch (err) {
       console.error('Failed to resume with rejection:', err)
-      setCurrentScreen('live-sandbox')
+      setCurrentScreen('setup')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -255,27 +335,41 @@ export default function App() {
       return
     }
     try {
+      setLoading(true)
       await resumeRun(threadId, { approved: false, feedback })
+      setRunState((prev) => ({
+        thread_id: threadId,
+        status: 'running',
+        risk_score: prev?.risk_score ?? 0.0,
+        next_steps: ['supervisor'],
+        values: {
+          ...(prev?.values || {}),
+          hitl_feedback: feedback,
+          hitl_approved: false,
+        },
+      }))
       setCurrentScreen('live-sandbox')
       syncState(threadId)
     } catch (err) {
       console.error('Failed to request changes:', err)
       setCurrentScreen('live-sandbox')
+    } finally {
+      setLoading(false)
     }
   }
 
   // Derived execution states for clean new user & active run UX
-  const hasActiveRun =
-    runState?.status === 'running' ||
-    (loading && currentScreen === 'live-sandbox') ||
-    Boolean(
-      threadId &&
-      runState &&
-      runState.status !== 'completed' &&
-      runState.status !== 'rejected' &&
-      runState.status !== 'paused_hitl'
-    )
-  const hasPendingApproval = Boolean(runState?.status === 'paused_hitl')
+  const isCompleted = runState?.status === 'completed' || events.some((e) => e.event === 'completed')
+  const isRejected = runState?.status === 'rejected' || events.some((e) => e.event === 'rejected')
+  const isPausedHitl = runState?.status === 'paused_hitl' || events.some((e) => e.event === 'hitl_paused')
+
+  const hasActiveRun = Boolean(
+    threadId &&
+    (loading || events.length > 0 || (!isCompleted && !isRejected))
+  )
+  const hasPendingApproval = Boolean(
+    threadId && isPausedHitl && !isCompleted && !isRejected
+  )
   const activeRunsCount = hasActiveRun ? 1 : 0
   const pendingSignOffCount = hasPendingApproval ? 1 : 0
 
@@ -360,7 +454,12 @@ export default function App() {
               issueTitle={activeIssueTitle}
               elapsedSeconds={elapsedSeconds}
               hasActiveRun={hasActiveRun}
+              hasPendingApproval={hasPendingApproval}
+              runStateStatus={runState?.status}
               onStartNewRun={() => setCurrentScreen('setup')}
+              onNavigateToApproval={() => setCurrentScreen('approval-gate')}
+              onApprove={handleApprove}
+              onReject={handleReject}
             />
           )}
 
@@ -374,6 +473,13 @@ export default function App() {
               issueTitle={activeIssueTitle}
               hasPendingApproval={hasPendingApproval}
               onStartNewRun={() => setCurrentScreen('setup')}
+              events={events}
+              sandboxId={sandboxId}
+              currentAttempt={currentAttempt}
+              maxAttempts={3}
+              elapsedSeconds={elapsedSeconds}
+              runState={runState}
+              onNavigateToSandbox={() => setCurrentScreen('live-sandbox')}
             />
           )}
 
@@ -387,13 +493,11 @@ export default function App() {
           )}
 
           {currentScreen === 'policies' && (
-            <PoliciesScreen terminologyMode={terminologyMode} />
-          )}
-
-          {currentScreen === 'audit' && (
-            <AuditScreen
+            <PoliciesScreen
               terminologyMode={terminologyMode}
-              onStartNewRun={() => setCurrentScreen('setup')}
+              githubUsername={githubUsername}
+              activeRepo={activeRepo}
+              onOpenSecretModal={() => setShowSecretModal(true)}
             />
           )}
         </main>

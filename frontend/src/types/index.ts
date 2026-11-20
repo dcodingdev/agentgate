@@ -4,7 +4,6 @@ export type ScreenId =
   | 'approval-gate'
   | 'finished'
   | 'policies'
-  | 'audit'
 
 export type TerminologyMode = 'plain' | 'both' | 'tech'
 
@@ -13,7 +12,6 @@ export type NavItemId =
   | 'runs'
   | 'sign-off'
   | 'policies'
-  | 'audit'
   | 'settings'
 
 export interface StageDefinition {
@@ -133,6 +131,7 @@ export interface ResumeRunResponse {
   thread_id: string
   status: string
   message: string
+  pr_url?: string | null
 }
 
 export interface RunStateResponse {

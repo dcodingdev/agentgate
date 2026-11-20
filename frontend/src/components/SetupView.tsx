@@ -6,29 +6,7 @@ interface SetupViewProps {
   loading?: boolean
 }
 
-const DEFAULT_REPOS: RepoOption[] = [
-  {
-    name: 'priya/shop-api',
-    status: 'test-allowed',
-    statusLabel: 'Test repo · allowed',
-    defaultIssueUrl: 'https://github.com/priya/shop-api/issues/60',
-    defaultIssueTitle: 'Login tokens never expire',
-  },
-  {
-    name: 'priya/blog',
-    status: 'allowed',
-    statusLabel: 'Allowed',
-    defaultIssueUrl: 'https://github.com/priya/blog/issues/12',
-    defaultIssueTitle: 'RSS feed generation produces malformed XML',
-  },
-  {
-    name: 'org/internal-tools',
-    status: 'not-allowed',
-    statusLabel: 'Not on allowlist',
-    defaultIssueUrl: 'https://github.com/org/internal-tools/issues/5',
-    defaultIssueTitle: 'Database migration script failure',
-  },
-]
+const DEFAULT_REPOS: RepoOption[] = []
 
 export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = false }) => {
   const [e2bStatus] = useState<string>('Connected')
@@ -40,8 +18,8 @@ export const SetupView: React.FC<SetupViewProps> = ({ onStartRun, loading = fals
   const [tokenInput, setTokenInput] = useState<string>('')
 
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [selectedRepo, setSelectedRepo] = useState<string>('priya/shop-api')
-  const [issueUrl, setIssueUrl] = useState<string>('https://github.com/priya/shop-api/issues/60')
+  const [selectedRepo, setSelectedRepo] = useState<string>('')
+  const [issueUrl, setIssueUrl] = useState<string>('')
 
   const handleVerifyToken = (e: React.FormEvent) => {
     e.preventDefault()

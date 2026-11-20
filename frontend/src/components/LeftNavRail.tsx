@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Activity,
   CheckSquare,
   Key,
   Lock,
@@ -92,12 +91,6 @@ export const LeftNavRail: React.FC<LeftNavRailProps> = ({
       screen: 'policies',
       label: 'Repositories & Policies',
       icon: Shield,
-    },
-    {
-      id: 'audit',
-      screen: 'audit',
-      label: 'Activity & Audit',
-      icon: Activity,
     },
   ]
 

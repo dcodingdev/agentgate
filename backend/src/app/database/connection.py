@@ -40,6 +40,7 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
 
     try:
         import asyncio
+        # pyrefly: ignore[missing-import]
         import psycopg
 
         logger.info("Probing PostgreSQL at %s", settings.database_url)

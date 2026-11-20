@@ -39,6 +39,7 @@ class ResumeRunResponse(BaseModel):
     thread_id: str = Field(..., description="Thread ID of the resumed run")
     status: str = Field(..., description="Resumed status")
     message: str = Field(..., description="Status description")
+    pr_url: Optional[str] = Field(default=None, description="Created Pull Request URL if approved and completed")
 
 
 class RunStateResponse(BaseModel):

@@ -12,10 +12,21 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def fetch_github_issue(repo: str, issue_number: int, github_token: str = "") -> Dict[str, Any]:
+def fetch_github_issue(
+    repo: str,
+    issue_number: int,
+    github_token: str = "",
+    issue_title: str = "",
+    issue_description: str = "",
+) -> Dict[str, Any]:
     """Fetch issue details and discussions via GitHub MCP."""
     client = get_mcp_client()
-    args: Dict[str, Any] = {"repo": repo, "issue_id": issue_number}
+    args: Dict[str, Any] = {
+        "repo": repo,
+        "issue_id": issue_number,
+        "issue_title": issue_title,
+        "issue_description": issue_description,
+    }
     if github_token:
         args["github_token"] = github_token
     return client.call_tool_sync("github", "get_issue", args)

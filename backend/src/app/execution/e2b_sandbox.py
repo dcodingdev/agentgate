@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 # Active sandboxes registry for reconnecting / tracking
 _active_sandboxes: Dict[str, Any] = {}
 _mock_sandboxes: Dict[str, Dict[str, Any]] = {}
+_initialized_sandboxes: set[str] = set()
 
 
 class E2BSandboxError(Exception):
@@ -27,10 +28,63 @@ def _get_e2b_sandbox_class() -> Optional[Any]:
         return None
 
 
-async def create_sandbox(template: Optional[str] = None) -> str:
-    """Create a new E2B sandbox instance or mock if key is unset."""
+def init_sandbox_repo_sync(
+    sandbox_id: str,
+    repo: Optional[str] = None,
+    token: Optional[str] = None,
+) -> None:
+    """Initialize /repo workspace and clone the target repository in sandbox."""
+    if sandbox_id in _initialized_sandboxes:
+        return
+
+    logger.info("Setting up /repo directory in sandbox [%s]...", sandbox_id)
+    # 1. Guarantee /repo exists and is owned by user (avoid root permission denied)
+    setup_dir_cmd = (
+        "(sudo mkdir -p /repo && sudo chown -R $(id -u):$(id -g) /repo 2>/dev/null) || "
+        "(mkdir -p /home/user/repo && (sudo ln -sf /home/user/repo /repo 2>/dev/null || true))"
+    )
+    run_command_sync(sandbox_id, setup_dir_cmd)
+
+    clean_repo = ""
+    if repo:
+        clean_repo = (
+            str(repo)
+            .removeprefix("https://github.com/")
+            .removeprefix("http://github.com/")
+            .removeprefix("github.com/")
+            .strip("/")
+        )
+
+    # 2. Clone repository if valid GitHub repo
+    if clean_repo and clean_repo not in ("test/repo", "org/repo", "mock/repo") and not clean_repo.startswith("test/"):
+        logger.info("Cloning repository %s into sandbox [%s]...", clean_repo, sandbox_id)
+        clone_parts = []
+        if token and not token.startswith("mock") and not token.startswith("ghp_your"):
+            clone_parts.append(f"git clone --depth 1 https://x-access-token:{token}@github.com/{clean_repo}.git /repo 2>/dev/null")
+        clone_parts.append(f"git clone --depth 1 https://github.com/{clean_repo}.git /repo 2>/dev/null")
+
+        clone_cmd = f"if [ ! -d '/repo/.git' ]; then ({' || '.join(clone_parts)} || true); fi"
+        run_command_sync(sandbox_id, clone_cmd, timeout=90)
+
+    # 3. Ensure fallback README and git repo so tool commands never crash
+    fallback_setup = (
+        "cd /repo && "
+        "if [ ! -f 'README.md' ]; then echo '# " + (clean_repo or "Repository") + "' > README.md; fi && "
+        "if [ ! -d '.git' ]; then git init -q 2>/dev/null && git config user.name 'AgentGate' && git config user.email 'agent@agentgate.dev' || true; fi"
+    )
+    run_command_sync(sandbox_id, fallback_setup, timeout=30)
+    _initialized_sandboxes.add(sandbox_id)
+
+
+async def create_sandbox(
+    template: Optional[str] = None,
+    repo: Optional[str] = None,
+    github_token: Optional[str] = None,
+) -> str:
+    """Create a new E2B sandbox instance or mock if key is unset, and prepare workspace."""
     settings = get_settings()
     template_name = template or settings.e2b_template
+    active_token = github_token or settings.github_token
 
     if settings.e2b_api_key and not settings.e2b_api_key.startswith("mock"):
         Sandbox = _get_e2b_sandbox_class()
@@ -43,6 +97,7 @@ async def create_sandbox(template: Optional[str] = None) -> str:
                 sandbox_id = getattr(sandbox, "sandbox_id", getattr(sandbox, "id", str(uuid.uuid4().hex[:12])))
                 _active_sandboxes[sandbox_id] = sandbox
                 logger.info("Created real E2B sandbox: %s (template: %s)", sandbox_id, template_name)
+                init_sandbox_repo_sync(sandbox_id, repo=repo, token=active_token)
                 return sandbox_id
             except Exception as exc:
                 logger.warning("E2B initialization failed (%s). Falling back to mock sandbox.", exc)
@@ -55,6 +110,7 @@ async def create_sandbox(template: Optional[str] = None) -> str:
         "files": {},
     }
     logger.info("Initialized mock E2B sandbox: %s", sandbox_id)
+    init_sandbox_repo_sync(sandbox_id, repo=repo, token=active_token)
     return sandbox_id
 
 
@@ -96,11 +152,15 @@ def run_command_sync(sandbox_id: str, command: str, timeout: int = 120) -> Dict[
                 "error": None,
             }
         except Exception as exc:
-            logger.error("Sandbox command failed: %s", exc)
+            # Preserve output if E2B raised CommandExitException for non-zero exit codes
+            exit_code = getattr(exc, "exit_code", 1)
+            stdout = getattr(exc, "stdout", "")
+            stderr = getattr(exc, "stderr", str(exc))
+            logger.info("Sandbox command [%s] exited with code %s: %s", command[:60], exit_code, exc)
             return {
-                "exit_code": 1,
-                "stdout": "",
-                "stderr": str(exc),
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
                 "error": str(exc),
             }
 

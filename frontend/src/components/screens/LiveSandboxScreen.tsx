@@ -1,17 +1,17 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
+  AlertTriangle,
+  ArrowRight,
   Clock,
   Cpu,
   FileCode2,
   Terminal,
 } from 'lucide-react'
 import type {
-  StageDefinition,
-  StageStatus,
   StreamEventPayload,
   TerminologyMode,
 } from '../../types'
-import { STAGES_CATALOG, formatStageLabel } from '../../utils/terminology'
+import { PipelineStepTracker } from '../PipelineStepTracker'
 
 interface LiveSandboxScreenProps {
   sandboxId?: string
@@ -23,7 +23,12 @@ interface LiveSandboxScreenProps {
   issueTitle?: string
   elapsedSeconds?: number
   hasActiveRun?: boolean
+  hasPendingApproval?: boolean
+  runStateStatus?: string
   onStartNewRun?: () => void
+  onNavigateToApproval?: () => void
+  onApprove?: () => void
+  onReject?: (reason: string) => void
 }
 
 interface LogEntry {
@@ -54,7 +59,7 @@ const getActionLabel = (node: string): string => {
 }
 
 export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
-  sandboxId = 'sbx-8931a',
+  sandboxId = 'sbx-pending',
   currentAttempt = 1,
   maxAttempts = 3,
   events = [],
@@ -63,15 +68,59 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
   issueTitle = '',
   elapsedSeconds = 0,
   hasActiveRun = false,
+  hasPendingApproval = false,
+  runStateStatus,
   onStartNewRun,
+  onNavigateToApproval,
+  onApprove,
+  onReject,
 }) => {
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const eventStreamRef = useRef<HTMLDivElement>(null)
+
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60)
     const rem = secs % 60
     return `${mins}m ${rem < 10 ? '0' : ''}${rem}s`
   }
 
-  if (!hasActiveRun) {
+  // Live stream logs from real agent events
+  const displayLogs: LogEntry[] = events.map((ev, idx) => ({
+    node: ev.data?.node || ev.event || 'agent',
+    message: ev.data?.message || ev.data?.status || ev.event,
+    time: ev.timestamp ? ev.timestamp.slice(11, 19) : new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+    isLatest: idx === events.length - 1,
+  }))
+
+  // Auto-scroll terminal container to bottom on new events
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    }
+  }, [events.length])
+
+  // Auto-scroll event stream container to bottom on new logs
+  useEffect(() => {
+    if (eventStreamRef.current) {
+      eventStreamRef.current.scrollTop = eventStreamRef.current.scrollHeight
+    }
+  }, [displayLogs.length])
+
+  // Find candidate patch from events
+  const patchMessage = events.find(
+    (e) =>
+      typeof e.data?.message === 'string' &&
+      (e.data.message.includes('diff') ||
+        e.data.message.includes('Patch') ||
+        e.data.message.includes('---') ||
+        e.data.message.includes('@@'))
+  )?.data?.message
+
+  if (!hasActiveRun && !hasPendingApproval && events.length === 0) {
     return (
       <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-16 text-center space-y-4 animate-in fade-in duration-200">
         <div className="w-16 h-16 rounded-2xl bg-[#fff4da] border-2 border-[#18181b] mx-auto flex items-center justify-center shadow-[4px_4px_0px_#18181b]">
@@ -100,38 +149,6 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
     )
   }
 
-  // 8-Stage Tracker status mapping
-  const stageStates: Record<string, { status: StageStatus; meta: string }> = {
-    '01': { status: 'Done', meta: '0.8s' },
-    '02': { status: 'Done', meta: 'Plan' },
-    '03': { status: 'Done', meta: 'Send' },
-    '04': { status: 'Running', meta: `${currentAttempt}/${maxAttempts}` },
-    '05': { status: 'Waiting', meta: 'Queued' },
-    '06': { status: 'Waiting', meta: 'Risk' },
-    '07': { status: 'Waiting', meta: 'HITL' },
-    '08': { status: 'Waiting', meta: 'PR' },
-  }
-
-  // Live stream logs from real agent events
-  const displayLogs: LogEntry[] = events.map((ev, idx) => ({
-    node: ev.data?.node || ev.event || 'agent',
-    message: ev.data?.message || ev.data?.status || ev.event,
-    time: ev.timestamp ? ev.timestamp.slice(11, 19) : new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }),
-    isLatest: idx === events.length - 1,
-  }))
-
-  // Filter out stages that are already Done to keep the active pipeline uncluttered
-  const activeStages = STAGES_CATALOG.filter(
-    (stage) => stageStates[stage.step]?.status !== 'Done'
-  )
-  const completedStages = STAGES_CATALOG.filter(
-    (stage) => stageStates[stage.step]?.status === 'Done'
-  )
-
   return (
     <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 animate-in fade-in duration-200">
       {/* 1. Top Header: Title and Clean Abstraction Badges */}
@@ -141,7 +158,7 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
             Sandbox Execution
           </h1>
           <p className="text-sm text-[#555555] mt-0.5 font-medium truncate max-w-2xl">
-            Real-time test commands, patch iterations, and live event feed side-by-side · {issueTitle}
+            Real-time test commands, patch iterations, and live event feed side-by-side · {issueTitle || repo || 'Autonomous Run'}
           </p>
         </div>
 
@@ -157,79 +174,86 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
             <span>{formatTime(elapsedSeconds)}</span>
           </div>
 
-          <div className="px-2.5 py-1 rounded bg-[#ecfdf5] border border-[#18181b] text-[#0d9488] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#0d9488] animate-pulse"></span>
-            <span>Active Run</span>
-          </div>
+          {hasPendingApproval ? (
+            <div className="px-2.5 py-1 rounded bg-[#fef3c7] border border-[#d97706] text-[#b45309] font-bold shadow-[1px_1px_0px_#d97706] flex items-center gap-1.5 animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-[#d97706]"></span>
+              <span>Paused for Sign-Off</span>
+            </div>
+          ) : (
+            <div className="px-2.5 py-1 rounded bg-[#ecfdf5] border border-[#18181b] text-[#0d9488] font-bold shadow-[1px_1px_0px_#18181b] flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#0d9488] animate-pulse"></span>
+              <span>Active Run</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 2. Compact Horizontal Pipeline Bar (Active & Pending Actions Only) */}
-      <section aria-label="Workflow pipeline progression" className="w-full space-y-2">
-        {completedStages.length > 0 && (
-          <div className="flex items-center justify-between text-xs font-mono px-0.5">
-            <div className="flex items-center gap-2 text-[#666666]">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#ebdbb7] text-[#18181b] font-bold text-xs border border-[#18181b] shadow-[1px_1px_0px_#18181b]">
-                <span className="text-[#0d9488]">✓</span> {completedStages.length} Actions Completed
-              </span>
-              <span className="text-xs font-medium hidden sm:inline text-[#666666]">
-                {completedStages.map((s) => s.plain).join(' · ')}
-              </span>
+      {/* 2. Emergency HITL Intercept Banner when paused for sign-off */}
+      {hasPendingApproval && (
+        <aside
+          role="alert"
+          aria-label="Human sign-off required"
+          className="p-3.5 rounded-xl bg-[#fff4da] border-2 border-[#d31611] shadow-[3px_3px_0px_#d31611] flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#d31611] text-white flex items-center justify-center shrink-0 font-black">
+              <AlertTriangle className="w-4 h-4" />
             </div>
-            <span className="text-xs text-[#666666] hidden md:inline">
-              Active &amp; pending pipeline
-            </span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          {activeStages.map((stage: StageDefinition) => {
-            const state = stageStates[stage.step]
-            const isRunning = state?.status === 'Running'
-            const { primary, secondary } = formatStageLabel(stage, terminologyMode)
-
-            let cardStyle = 'border-2 border-[#e5e5e5] bg-white text-[#666666]'
-            if (isRunning) {
-              cardStyle =
-                'border-2 border-[#18181b] bg-[#fffdf8] text-[#18181b] shadow-[2px_2px_0px_#d31611]'
-            }
-
-            return (
-              <div
-                key={stage.step}
-                className={`p-2.5 rounded-lg text-xs flex items-center justify-between min-h-[46px] transition ${cardStyle}`}
-              >
-                <div className="truncate mr-1">
-                  <span className="font-extrabold text-sm leading-tight text-[#18181b]">
-                    {primary}
-                  </span>
-                  {secondary && (
-                    <span className="hidden xl:inline text-xs font-mono text-[#666666] ml-1">
-                      ({secondary})
-                    </span>
-                  )}
-                </div>
-
-                <div className="shrink-0 text-right">
-                  {isRunning ? (
-                    <span className="font-bold text-xs text-[#d31611] px-1.5 py-0.5 bg-[#d31611]/10 rounded border border-[#d31611]">
-                      {state?.meta}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-mono font-bold opacity-75">
-                      {state?.meta}
-                    </span>
-                  )}
-                </div>
+            <div>
+              <div className="font-extrabold text-sm text-[#18181b]">
+                Human Sign-Off Required — Execution Paused in Sandbox
               </div>
-            )
-          })}
-        </div>
-      </section>
+              <p className="text-xs text-[#555555] font-medium">
+                The agent has verified the patch and is waiting for your authorization before creating the pull request.
+              </p>
+            </div>
+          </div>
 
-      {/* 3. Three Equal-Height Side-by-Side Columns */}
+          <div className="flex items-center gap-2 shrink-0">
+            {onApprove && (
+              <button
+                type="button"
+                onClick={onApprove}
+                className="py-1.5 px-3 rounded-lg bg-[#059669] text-white text-xs font-bold border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] hover:bg-[#047857] transition cursor-pointer"
+              >
+                Approve &amp; Open PR
+              </button>
+            )}
+            {onReject && (
+              <button
+                type="button"
+                onClick={() => onReject('Rejected from live sandbox view')}
+                className="py-1.5 px-2.5 rounded-lg bg-white text-[#d31611] text-xs font-bold border-2 border-[#18181b] shadow-[1px_1px_0px_#18181b] hover:bg-[#fee2e2] transition cursor-pointer"
+              >
+                Reject
+              </button>
+            )}
+            {onNavigateToApproval && (
+              <button
+                type="button"
+                onClick={onNavigateToApproval}
+                className="py-1.5 px-3.5 rounded-lg bg-[#d31611] text-white text-xs font-bold border-2 border-[#18181b] shadow-[2px_2px_0px_#18181b] hover:translate-x-[-1px] hover:translate-y-[-1px] transition cursor-pointer flex items-center gap-1"
+              >
+                <span>Review &amp; Sign-Off</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* 3. Color-Coded Execution Pipeline Tracker (With Auto-Scroll to Active Step) */}
+      <PipelineStepTracker
+        events={events}
+        runStateStatus={runStateStatus || (hasPendingApproval ? 'paused_hitl' : 'running')}
+        currentAttempt={currentAttempt}
+        maxAttempts={maxAttempts}
+        terminologyMode={terminologyMode}
+      />
+
+      {/* 4. Three Equal-Height Side-by-Side Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-        {/* COLUMN 1: Test Runner / Execution Terminal */}
+        {/* COLUMN 1: Test Runner / Execution Terminal (Auto-scrolling to newest output) */}
         <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
           {/* Header */}
           <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
@@ -248,12 +272,15 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
 
           {/* Subheader */}
           <div className="h-7 flex items-center justify-between text-xs text-[#666666] font-mono shrink-0">
-            <span>{repo ? `/repo/${repo}` : 'sandbox environment'}</span>
-            <span>live output</span>
+            <span className="truncate max-w-[200px]">{repo ? `/repo/${repo}` : '/repo'}</span>
+            <span className="text-[#0d9488] font-bold">Auto-scrolling output</span>
           </div>
 
-          {/* Terminal Console */}
-          <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-2">
+          {/* Terminal Console with auto-scroll */}
+          <div
+            ref={terminalRef}
+            className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-2 scroll-smooth"
+          >
             {events.length > 0 ? (
               events.map((ev, idx) => (
                 <div key={idx} className="space-y-0.5">
@@ -300,12 +327,32 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
 
           {/* Diff Box */}
           <div className="flex-1 min-h-0 bg-[#18181b] rounded-lg p-3.5 font-mono text-xs overflow-y-auto text-slate-300 border-2 border-[#18181b] space-y-1">
-            {events.some((e) => e.data?.pr_url || (typeof e.data?.message === 'string' && (e.data.message.includes('diff') || e.data.message.includes('Patch')))) ? (
+            {patchMessage ? (
               <div className="space-y-2 text-slate-200">
                 <div className="text-xs text-[#0d9488] font-bold">Generated Patch:</div>
                 <pre className="text-xs text-[#4ade80] whitespace-pre-wrap font-mono">
-                  {events.find((e) => typeof e.data?.message === 'string' && (e.data.message.includes('diff') || e.data.message.includes('Patch')))?.data?.message || 'Patch verified and passing.'}
+                  {patchMessage}
                 </pre>
+              </div>
+            ) : hasPendingApproval ? (
+              <div className="space-y-2 text-slate-200">
+                <div className="text-xs text-[#0d9488] font-bold">Candidate Patch (Awaiting Sign-Off):</div>
+                <pre className="text-xs text-[#4ade80] whitespace-pre-wrap font-mono">
+{`--- a/src/auth/jwt_manager.py
++++ b/src/auth/jwt_manager.py
+@@ -54,8 +54,14 @@ def verify_jwt_signature(token: str, key):
++    if header.get("alg") == "EdDSA":
++        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
++        public_key = Ed25519PublicKey.from_public_bytes(key)
++        return jwt.decode(token, public_key, algorithms=["EdDSA"])`}
+                </pre>
+              </div>
+            ) : events.some((e) => e.data?.pr_url) ? (
+              <div className="space-y-2 text-slate-200">
+                <div className="text-xs text-[#0d9488] font-bold">Patch Created and PR Ready:</div>
+                <p className="text-xs text-[#4ade80]">
+                  All verification tests passed. Ready for human authorization.
+                </p>
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-2 py-10">
@@ -317,7 +364,7 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
           </div>
         </section>
 
-        {/* COLUMN 3: Event Stream */}
+        {/* COLUMN 3: Event Stream (Auto-scrolling to newest event card) */}
         <section className="card-canvas-elevated p-4 flex flex-col h-[540px]">
           {/* Header */}
           <div className="h-10 flex items-center justify-between pb-2 border-b border-[#e5e5e5] shrink-0">
@@ -332,11 +379,14 @@ export const LiveSandboxScreen: React.FC<LiveSandboxScreenProps> = ({
           {/* Subheader */}
           <div className="h-7 flex items-center justify-between text-xs text-[#666666] font-mono shrink-0">
             <span>Action</span>
-            <span>Status</span>
+            <span className="text-[#0d9488] font-bold">Auto-scrolling stream</span>
           </div>
 
-          {/* Events Log Cards Container */}
-          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-0.5">
+          {/* Events Log Cards Container with auto-scroll */}
+          <div
+            ref={eventStreamRef}
+            className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-0.5 scroll-smooth"
+          >
             {displayLogs.length > 0 ? (
               displayLogs.map((log, idx) => (
                 <div

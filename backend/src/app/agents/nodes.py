@@ -3,10 +3,11 @@
 import logging
 import re
 from typing import Any, Dict
+# pyrefly: ignore[missing-import]
 from langchain_core.messages import AIMessage
 from app.agents.state import SWEState
 from app.config import get_settings
-from app.execution.e2b_sandbox import create_sandbox
+from app.execution.e2b_sandbox import create_sandbox, init_sandbox_repo_sync
 from app.tools.code_executor import apply_patch, run_tests, search_code, read_repo_file
 from app.tools.mcp_tools import create_pull_request, fetch_github_issue
 from app.tools.repo_tools_server import compute_risk_score_fn
@@ -52,7 +53,16 @@ async def supervisor_node(state: SWEState) -> Dict[str, Any]:
     sandbox_id = state.get("sandbox_id")
 
     if not sandbox_id:
-        sandbox_id = await create_sandbox()
+        sandbox_id = await create_sandbox(
+            repo=state.get("repo"),
+            github_token=state.get("github_token"),
+        )
+    else:
+        init_sandbox_repo_sync(
+            sandbox_id,
+            repo=state.get("repo"),
+            token=state.get("github_token"),
+        )
 
     issue_title = (state.get("issue_title") or "").lower()
     issue_desc = (state.get("issue_description") or "").lower()
@@ -155,6 +165,8 @@ async def issue_analysis_node(state: SWEState) -> Dict[str, Any]:
                 "repo": repo,
                 "issue_number": issue_id,
                 "github_token": state.get("github_token") or "",
+                "issue_title": issue_title,
+                "issue_description": issue_desc,
             })
             if issue_data and isinstance(issue_data, dict) and issue_data.get("title"):
                 analysis = (
@@ -247,6 +259,7 @@ async def aggregate_research_node(state: SWEState) -> Dict[str, Any]:
     return {
         "research_findings": consolidated,
         "files_changed": files_changed,
+        "test_results": None,  # Reset test results so supervisor transitions to fix_test with new findings
         "messages": [AIMessage(content=f"Parallel Research synthesized:\n{consolidated}")],
     }
 
