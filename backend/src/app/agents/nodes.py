@@ -376,12 +376,40 @@ async def pr_agent_node(state: SWEState) -> Dict[str, Any]:
         f"### Risk Score: {state.get('risk_score', 0.0)}"
     )
 
+    clean_repo = (
+        repo.strip()
+        .removeprefix("https://github.com/")
+        .removeprefix("http://github.com/")
+        .removeprefix("github.com/")
+        .strip("/")
+    )
+    branch = f"agentgate-fix-{state.get('thread_id', '1')}"
+    token = state.get("github_token") or ""
+    sandbox_id = state.get("sandbox_id")
+
+    # If active in sandbox with user token, push the actual committed fix branch to remote
+    if sandbox_id and token:
+        try:
+            from app.execution.e2b_sandbox import run_command
+            push_cmd = (
+                f"cd /repo && "
+                f"git config user.name 'AgentGate Bot' && "
+                f"git config user.email 'bot@agentgate.dev' && "
+                f"git checkout -B {branch} && "
+                f"git add -A && "
+                f"(git commit -m '{title}' || true) && "
+                f"git push https://x-access-token:{token}@github.com/{clean_repo}.git {branch} --force"
+            )
+            await run_command(sandbox_id, push_cmd, timeout=60)
+        except Exception as exc:
+            logger.warning("Could not push branch from sandbox: %s", exc)
+
     pr_url = create_pull_request.invoke({
         "repo": repo,
         "title": title,
-        "head_branch": f"agentgate-fix-{state.get('thread_id', '1')}",
+        "head_branch": branch,
         "body": body,
-        "github_token": state.get("github_token") or "",
+        "github_token": token,
     })
 
     return {

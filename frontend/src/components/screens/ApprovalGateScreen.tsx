@@ -91,26 +91,22 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
     if (onApprove) onApprove()
   }
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!feedback.trim()) {
-      setErrorMessage('Please enter directives explaining the requested changes.')
-      return
-    }
+  const handleSubmitEdit = (e?: React.FormEvent, customFeedback?: string) => {
+    if (e) e.preventDefault()
+    const content = (customFeedback !== undefined ? customFeedback : feedback).trim()
+    const finalFeedback = content || 'Please revise the proposed patch based on test results.'
     setSubmittedStatus(
       `Directives sent to ${teamLeadTitle} (${teamLeadTech})! Re-planning autonomous patch loop...`
     )
-    if (onRequestChanges) onRequestChanges(feedback)
+    if (onRequestChanges) onRequestChanges(finalFeedback)
   }
 
-  const handleSubmitReject = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!feedback.trim()) {
-      setErrorMessage('Feedback is required to document why the patch was rejected.')
-      return
-    }
+  const handleSubmitReject = (e?: React.FormEvent, customReason?: string) => {
+    if (e) e.preventDefault()
+    const reason = (customReason !== undefined ? customReason : feedback).trim()
+    const finalReason = reason || 'Rejected by operator (No reason provided)'
     setSubmittedStatus('Execution terminated. Isolated sandbox environment purged.')
-    if (onReject) onReject(feedback)
+    if (onReject) onReject(finalReason)
   }
 
   // Derive candidate patch: use real patch if in state or events, otherwise fall back to clean RFC patch
@@ -453,64 +449,98 @@ export const ApprovalGateScreen: React.FC<ApprovalGateScreenProps> = ({
             )}
 
             {actionType === 'edit' ? (
-              <form onSubmit={handleSubmitEdit} className="space-y-2 animate-in fade-in">
-                <label className="block text-[11px] font-bold text-[#18181b]">
-                  Sent to {teamLeadTitle} ({teamLeadTech}):
-                </label>
+              <form onSubmit={(e) => handleSubmitEdit(e)} className="space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-[#18181b]">
+                    Sent to {teamLeadTitle} ({teamLeadTech}):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleSubmitEdit(undefined, 'Revise patch based on test results.')}
+                    className="text-[10px] text-[#666666] hover:text-[#18181b] underline font-bold cursor-pointer"
+                  >
+                    Skip Reason &rarr;
+                  </button>
+                </div>
                 <textarea
-                  required
                   rows={2}
                   value={feedback}
                   onChange={(e) => {
                     setFeedback(e.target.value)
                     setErrorMessage(null)
                   }}
-                  placeholder="Explain requested changes for supervisor re-planning..."
+                  placeholder="Explain requested changes (or skip to use automated test directives)..."
                   className="w-full bg-white border border-[#18181b] rounded p-2 text-xs text-[#18181b] focus:outline-none"
                 />
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setActionType('idle')}
-                    className="btn-outline-dark text-xs py-1 px-2.5"
+                    className="btn-outline-dark text-xs py-1 px-2.5 cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-cta text-xs py-1 px-3">
-                    Send to {teamLeadTitle} &rarr;
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSubmitEdit(undefined, 'Revise patch based on test results.')}
+                      className="btn-outline-dark text-xs py-1 px-2.5 text-[#555555] hover:text-[#18181b] cursor-pointer"
+                    >
+                      Skip Reason
+                    </button>
+                    <button type="submit" className="btn-cta text-xs py-1 px-3 cursor-pointer">
+                      Send to {teamLeadTitle} &rarr;
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : actionType === 'reject' ? (
-              <form onSubmit={handleSubmitReject} className="space-y-2 animate-in fade-in">
-                <label className="block text-[11px] font-bold text-[#d31611]">
-                  Rejection Reason (Purges Sandbox):
-                </label>
+              <form onSubmit={(e) => handleSubmitReject(e)} className="space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-[#d31611]">
+                    Rejection Reason (Purges Sandbox):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleSubmitReject(undefined, 'Rejected by operator (No reason provided)')}
+                    className="text-[10px] text-[#d31611] hover:underline font-bold cursor-pointer"
+                  >
+                    Skip Reason &amp; Purge &rarr;
+                  </button>
+                </div>
                 <textarea
-                  required
                   rows={2}
                   value={feedback}
                   onChange={(e) => {
                     setFeedback(e.target.value)
                     setErrorMessage(null)
                   }}
-                  placeholder="Explain why this run is rejected..."
+                  placeholder="Explain why this run is rejected (or skip to purge immediately)..."
                   className="w-full bg-white border border-[#dc2626] rounded p-2 text-xs text-[#18181b] focus:outline-none"
                 />
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setActionType('idle')}
-                    className="btn-outline-dark text-xs py-1 px-2.5"
+                    className="btn-outline-dark text-xs py-1 px-2.5 cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="bg-[#dc2626] text-white border-2 border-[#18181b] rounded-md text-xs py-1 px-3 font-bold"
-                  >
-                    Confirm Purge
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSubmitReject(undefined, 'Rejected by operator (No reason provided)')}
+                      className="btn-outline-dark text-xs py-1 px-2.5 text-[#d31611] hover:bg-[#fee2e2] cursor-pointer"
+                    >
+                      Skip Reason &amp; Purge
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-[#dc2626] text-white border-2 border-[#18181b] rounded-md text-xs py-1 px-3 font-bold hover:bg-[#b91c1c] transition cursor-pointer"
+                    >
+                      Confirm Purge
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : (

@@ -247,7 +247,7 @@ export default function App() {
     }
     try {
       setLoading(true)
-      const res = await resumeRun(threadId, { approved: true })
+      const res = await resumeRun(threadId, { approved: true, action: 'approve' })
       const finalPrUrl =
         res.pr_url ||
         runState?.pr_url ||
@@ -302,28 +302,26 @@ export default function App() {
   }
 
   const handleReject = async (reason: string) => {
-    if (!threadId) {
-      setCurrentScreen('setup')
-      return
+    const currentThread = threadId
+
+    // Clean up local session immediately to avoid getting trapped on the sign-off screen
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('agentgate_active_thread')
     }
+    setThreadId(null)
+    setRunState(null)
+    setEvents([])
+    setElapsedSeconds(0)
+    setErrorMessage(`Run rejected and sandbox purged: ${reason}`)
+    setCurrentScreen('setup')
+
+    if (!currentThread) return
+
     try {
       setLoading(true)
-      await resumeRun(threadId, { approved: false, feedback: reason })
-      setRunState((prev) => ({
-        thread_id: threadId,
-        status: 'rejected',
-        risk_score: prev?.risk_score ?? 0.0,
-        next_steps: [],
-        values: {
-          ...(prev?.values || {}),
-          guardrail_reason: reason,
-        },
-      }))
-      setErrorMessage(`Run terminated: ${reason}`)
-      setCurrentScreen('setup')
+      await resumeRun(currentThread, { approved: false, feedback: reason, action: 'reject' })
     } catch (err) {
       console.error('Failed to resume with rejection:', err)
-      setCurrentScreen('setup')
     } finally {
       setLoading(false)
     }
@@ -336,7 +334,7 @@ export default function App() {
     }
     try {
       setLoading(true)
-      await resumeRun(threadId, { approved: false, feedback })
+      await resumeRun(threadId, { approved: false, feedback, action: 'request_changes' })
       setRunState((prev) => ({
         thread_id: threadId,
         status: 'running',
@@ -346,6 +344,7 @@ export default function App() {
           ...(prev?.values || {}),
           hitl_feedback: feedback,
           hitl_approved: false,
+          hitl_action: 'request_changes',
         },
       }))
       setCurrentScreen('live-sandbox')

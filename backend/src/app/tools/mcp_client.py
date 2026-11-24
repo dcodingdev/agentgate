@@ -87,14 +87,8 @@ class MultiServerMCPClient:
                 .strip("/")
             )
             token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
-            is_mock_repo = (
-                clean_repo in ("test/repo", "org/repo", "mock/repo")
-                or clean_repo.startswith("test/")
-                or clean_repo.startswith("mock/")
-                or clean_repo.startswith("acme/")
-            )
 
-            if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
+            if token:
                 # pyrefly: ignore[missing-import]
                 import httpx
 
@@ -251,16 +245,10 @@ class MultiServerMCPClient:
             )
             token = arguments.get("github_token") or self.active_user_token or self.settings.github_token
 
-            is_mock_repo = (
-                clean_repo in ("test/repo", "org/repo", "mock/repo")
-                or clean_repo.startswith("test/")
-                or clean_repo.startswith("mock/")
-                or clean_repo.startswith("acme/")
-            )
-            if is_mock_repo or not token or token.startswith("mock") or token.startswith("ghp_your"):
+            if not token:
                 return self.call_tool_sync(server_name, tool_name, arguments)
 
-            if token and not token.startswith("mock") and not token.startswith("ghp_your") and not is_mock_repo:
+            if token:
                 import base64
                 # pyrefly: ignore[missing-import]
                 import httpx
@@ -342,50 +330,26 @@ class MultiServerMCPClient:
                                 else:
                                     base = "main"
 
-                            # 2. Get latest commit SHA on base branch to branch from
                             ref_resp = await client.get(
-                                f"https://api.github.com/repos/{clean_repo}/git/ref/heads/{base}",
+                                f"https://api.github.com/repos/{clean_repo}/git/ref/heads/{head}",
                                 headers=headers,
                                 timeout=15.0,
                             )
-                            if ref_resp.status_code == 200:
-                                base_sha = ref_resp.json().get("object", {}).get("sha")
-                                if base_sha:
-                                    # Create head branch ref if it doesn't exist
-                                    await client.post(
-                                        f"https://api.github.com/repos/{clean_repo}/git/refs",
-                                        headers=headers,
-                                        json={"ref": f"refs/heads/{head}", "sha": base_sha},
-                                        timeout=15.0,
-                                    )
-
-                                    # Commit verified fix to head branch
-                                    file_path = "src/core/session.py"
-                                    file_sha = None
-                                    file_resp = await client.get(
-                                        f"https://api.github.com/repos/{clean_repo}/contents/{file_path}?ref={head}",
-                                        headers=headers,
-                                        timeout=15.0,
-                                    )
-                                    if file_resp.status_code == 200:
-                                        file_sha = file_resp.json().get("sha")
-
-                                    fixed_code = '"""Session token verification service."""\nfrom datetime import datetime, timezone\n\nclass AuthenticationError(Exception):\n    pass\n\nclass SessionContext:\n    def __init__(self, user_id: str, expires_at: datetime):\n        self.user_id = user_id\n        self.expires_at = expires_at\n\n    def is_expired(self) -> bool:\n        return datetime.now(timezone.utc) > self.expires_at\n\ndef verify_session(session: SessionContext) -> bool:\n    """Validate active session status."""\n    if not session:\n        raise AuthenticationError("Invalid session")\n    if session.is_expired():\n        raise AuthenticationError("Session token expired")\n    return True\n'
-                                    b64_content = base64.b64encode(fixed_code.encode("utf-8")).decode("utf-8")
-                                    commit_payload = {
-                                        "message": "fix(auth): enforce session token expiration check",
-                                        "content": b64_content,
-                                        "branch": head,
-                                    }
-                                    if file_sha:
-                                        commit_payload["sha"] = file_sha
-
-                                    await client.put(
-                                        f"https://api.github.com/repos/{clean_repo}/contents/{file_path}",
-                                        headers=headers,
-                                        json=commit_payload,
-                                        timeout=15.0,
-                                    )
+                            if ref_resp.status_code == 404:
+                                base_ref = await client.get(
+                                    f"https://api.github.com/repos/{clean_repo}/git/ref/heads/{base}",
+                                    headers=headers,
+                                    timeout=15.0,
+                                )
+                                if base_ref.status_code == 200:
+                                    base_sha = base_ref.json().get("object", {}).get("sha")
+                                    if base_sha:
+                                        await client.post(
+                                            f"https://api.github.com/repos/{clean_repo}/git/refs",
+                                            headers=headers,
+                                            json={"ref": f"refs/heads/{head}", "sha": base_sha},
+                                            timeout=15.0,
+                                        )
 
                             # 3. Create the Pull Request on GitHub
                             resp = await client.post(

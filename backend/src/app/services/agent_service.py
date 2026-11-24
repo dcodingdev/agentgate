@@ -223,22 +223,86 @@ class AgentService:
                 break
 
     async def resume_run(
-        self, thread_id: str, approved: bool, feedback: Optional[str] = None
+        self,
+        thread_id: str,
+        approved: bool,
+        feedback: Optional[str] = None,
+        action: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Resume a paused HITL run with approval decision and feedback."""
-        logger.info("Resuming run %s: approved=%s, feedback=%s", thread_id, approved, feedback)
+        logger.info(
+            "Resuming run %s: approved=%s, feedback=%s, action=%s",
+            thread_id,
+            approved,
+            feedback,
+            action,
+        )
         graph = get_graph()
         config = {"configurable": {"thread_id": thread_id}}
 
-        # Update state directly via graph.aupdate_state
-        state_update: Dict[str, Any] = {
-            "hitl_approved": approved,
-            "hitl_feedback": feedback,
-            "status": "running" if approved else ("fix_test" if feedback else "rejected"),
-        }
-        await graph.aupdate_state(config, state_update, as_node="hitl")
+        effective_action = action or ("approve" if approved else ("request_changes" if feedback else "reject"))
 
-        if approved:
+        if effective_action == "reject":
+            logger.info("Run %s rejected and purged by user.", thread_id)
+
+            # 1. Update metadata in database
+            metadata = await get_run_metadata(thread_id)
+            if metadata:
+                metadata.status = "rejected"
+                metadata.error_message = feedback or "Run rejected and purged by user"
+                await save_run_metadata(metadata)
+
+            # 2. Kill sandbox microVM if present
+            try:
+                snapshot = await graph.aget_state(config)
+                values = snapshot.values if snapshot else {}
+                sandbox_id = values.get("sandbox_id")
+                if sandbox_id:
+                    from app.execution.e2b_sandbox import kill_sandbox
+                    await kill_sandbox(sandbox_id)
+                    logger.info("Terminated sandbox %s for rejected run %s", sandbox_id, thread_id)
+            except Exception as exc:
+                logger.warning("Could not terminate sandbox for run %s: %s", thread_id, exc)
+
+            # 3. Update graph state to rejected
+            state_update: Dict[str, Any] = {
+                "hitl_approved": False,
+                "hitl_feedback": None,
+                "hitl_action": "reject",
+                "status": "rejected",
+                "error": feedback or "Run rejected and purged by user.",
+            }
+            await graph.aupdate_state(config, state_update, as_node="hitl")
+
+            # 4. Push rejected SSE event and done
+            queue = self._get_or_create_queue(thread_id)
+            await queue.put({
+                "event": "rejected",
+                "data": {
+                    "thread_id": thread_id,
+                    "status": "rejected",
+                    "reason": feedback or "Run rejected and purged by user.",
+                    "message": f"Run rejected and sandbox purged: {feedback or 'No reason provided'}",
+                },
+            })
+            await queue.put({"event": "done", "data": {"thread_id": thread_id}})
+
+            return {
+                "status": "rejected",
+                "thread_id": thread_id,
+                "approved": False,
+                "message": "Run rejected and sandbox purged successfully.",
+            }
+
+        elif approved:
+            # Update state directly via graph.aupdate_state
+            state_update: Dict[str, Any] = {
+                "hitl_approved": True,
+                "hitl_feedback": None,
+                "hitl_action": "approve",
+                "status": "running",
+            }
+            await graph.aupdate_state(config, state_update, as_node="hitl")
             # For approvals, execute pr_agent synchronously to generate and return PR immediately
             await self._execute_graph(thread_id, None)
             metadata = await get_run_metadata(thread_id)
@@ -250,9 +314,17 @@ class AgentService:
                 "pr_url": pr_url or f"https://github.com/pull/1",
             }
         else:
+            # Request revisions
+            state_update: Dict[str, Any] = {
+                "hitl_approved": False,
+                "hitl_feedback": feedback,
+                "hitl_action": "request_changes",
+                "status": "running",
+            }
+            await graph.aupdate_state(config, state_update, as_node="hitl")
             task = asyncio.create_task(self._execute_graph(thread_id, None))
             self.active_tasks[thread_id] = task
-            return {"status": "resumed", "thread_id": thread_id, "approved": approved}
+            return {"status": "resumed", "thread_id": thread_id, "approved": False}
 
     async def get_run_state(self, thread_id: str) -> Dict[str, Any]:
         """Fetch current checkpoint state, next steps, and database metadata."""

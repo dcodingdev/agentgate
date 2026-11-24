@@ -31,6 +31,7 @@ class ResumeBody(BaseModel):
 
     approved: bool = Field(..., description="True if change is approved, False to reject or request changes")
     feedback: Optional[str] = Field(default=None, description="Optional revision instructions or comments for the agent")
+    action: Optional[str] = Field(default=None, description="Explicit action: 'approve', 'request_changes', or 'reject'")
 
 
 class ResumeRunResponse(BaseModel):

@@ -54,6 +54,7 @@ class SWEState(TypedDict, total=False):
     hitl_required: bool
     hitl_approved: Optional[bool]
     hitl_feedback: Optional[str]
+    hitl_action: Optional[str]
 
     # Final outcome
     pr_url: Optional[str]

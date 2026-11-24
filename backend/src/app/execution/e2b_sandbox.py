@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 # Active sandboxes registry for reconnecting / tracking
 _active_sandboxes: Dict[str, Any] = {}
-_mock_sandboxes: Dict[str, Dict[str, Any]] = {}
 _initialized_sandboxes: set[str] = set()
 
 
@@ -56,10 +55,10 @@ def init_sandbox_repo_sync(
         )
 
     # 2. Clone repository if valid GitHub repo
-    if clean_repo and clean_repo not in ("test/repo", "org/repo", "mock/repo") and not clean_repo.startswith("test/"):
+    if clean_repo:
         logger.info("Cloning repository %s into sandbox [%s]...", clean_repo, sandbox_id)
         clone_parts = []
-        if token and not token.startswith("mock") and not token.startswith("ghp_your"):
+        if token:
             clone_parts.append(f"git clone --depth 1 https://x-access-token:{token}@github.com/{clean_repo}.git /repo 2>/dev/null")
         clone_parts.append(f"git clone --depth 1 https://github.com/{clean_repo}.git /repo 2>/dev/null")
 
@@ -104,6 +103,7 @@ async def create_sandbox(
 
     # Mock sandbox fallback
     sandbox_id = f"sbx_{uuid.uuid4().hex[:12]}"
+    # pyrefly: ignore[unknown-name]
     _mock_sandboxes[sandbox_id] = {
         "status": "running",
         "template": template_name,
@@ -130,7 +130,9 @@ async def reconnect_sandbox(sandbox_id: str) -> Optional[Any]:
             except Exception as exc:
                 logger.error("Could not reconnect to E2B sandbox %s: %s", sandbox_id, exc)
 
+    # pyrefly: ignore[unknown-name]
     if sandbox_id in _mock_sandboxes:
+        # pyrefly: ignore[unknown-name]
         return _mock_sandboxes[sandbox_id]
 
     return None
@@ -164,39 +166,6 @@ def run_command_sync(sandbox_id: str, command: str, timeout: int = 120) -> Dict[
                 "error": str(exc),
             }
 
-    # Mock execution mode
-    settings = get_settings()
-    is_mock = (
-        sandbox_id in _mock_sandboxes
-        or sandbox_id.startswith("test_")
-        or sandbox_id.startswith("sbx_")
-        or sandbox_id == "default_sandbox"
-        or (settings.e2b_api_key and settings.e2b_api_key.startswith("mock"))
-    )
-    if is_mock:
-        # Simulate common test runner output
-        if "pytest" in command:
-            return {
-                "exit_code": 0,
-                "stdout": "========================= 5 passed in 0.42s =========================",
-                "stderr": "",
-                "error": None,
-            }
-        elif "git apply" in command or "patch" in command:
-            return {
-                "exit_code": 0,
-                "stdout": "Patch applied cleanly.",
-                "stderr": "",
-                "error": None,
-            }
-        else:
-            return {
-                "exit_code": 0,
-                "stdout": f"[mock] executed: {command}",
-                "stderr": "",
-                "error": None,
-            }
-
     raise E2BSandboxError(f"Sandbox {sandbox_id} not found or expired.")
 
 
@@ -217,9 +186,5 @@ async def kill_sandbox(sandbox_id: str) -> bool:
         except Exception as exc:
             logger.error("Error terminating E2B sandbox %s: %s", sandbox_id, exc)
             return False
-
-    if sandbox_id in _mock_sandboxes:
-        _mock_sandboxes.pop(sandbox_id, None)
-        return True
 
     return False

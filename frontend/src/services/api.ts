@@ -7,7 +7,7 @@ import type {
   StreamEventPayload,
 } from '../types'
 
-const API_BASE = '' // Uses Vite dev proxy to localhost:8000
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '' // Uses Vite dev proxy or custom production backend URL
 
 export async function checkBackendHealth(): Promise<{ status: string; service: string; version: string }> {
   const res = await fetch(`${API_BASE}/health`)

@@ -78,11 +78,12 @@ async def resume_run(run_id: str, body: ResumeBody) -> ResumeRunResponse:
             thread_id=run_id,
             approved=body.approved,
             feedback=body.feedback,
+            action=body.action,
         )
         return ResumeRunResponse(
             thread_id=run_id,
             status=result["status"],
-            message="Decision recorded; agent execution resumed.",
+            message=result.get("message", "Decision recorded; agent execution resumed."),
             pr_url=result.get("pr_url"),
         )
     except Exception as exc:

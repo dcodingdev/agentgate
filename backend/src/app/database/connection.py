@@ -1,8 +1,16 @@
 """PostgreSQL connection pool and LangGraph PostgresSaver checkpointer setup."""
 
 import logging
+import sys
 from typing import Optional
 from contextlib import asynccontextmanager
+
+if sys.platform == "win32":
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 # pyrefly: ignore[missing-import]
 from psycopg_pool import AsyncConnectionPool
 # pyrefly: ignore[missing-import]
@@ -31,7 +39,6 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
         or "mock" in settings.database_url.lower()
         or "sqlite" in settings.database_url.lower()
         or os.getenv("DATABASE_URL") == "mock"
-        or os.getenv("TESTING")
     ):
         logger.info("Using in-memory store and MemorySaver (mock database configured).")
         _pool = None
@@ -58,12 +65,16 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
             max_size=20,
             open=False,
             timeout=2.0,
+            kwargs={"autocommit": True, "prepare_threshold": 0},
         )
         await _pool.open(wait=True, timeout=2.0)
 
         # Initialize run metadata table
         async with _pool.connection() as conn:
-            await conn.execute(CREATE_RUN_METADATA_TABLE)
+            for statement in CREATE_RUN_METADATA_TABLE.split(";"):
+                stmt = statement.strip()
+                if stmt:
+                    await conn.execute(stmt)
             await conn.commit()
 
         # Attempt to initialize PostgresSaver for LangGraph

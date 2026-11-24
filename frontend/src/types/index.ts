@@ -125,6 +125,7 @@ export interface CreateRunResponse {
 export interface ResumeBody {
   approved: boolean
   feedback?: string | null
+  action?: 'approve' | 'request_changes' | 'reject'
 }
 
 export interface ResumeRunResponse {

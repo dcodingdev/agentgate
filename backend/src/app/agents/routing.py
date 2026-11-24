@@ -126,14 +126,21 @@ def route_after_reviewer(state: SWEState, risk_threshold: Optional[float] = None
 
 def route_after_hitl(state: SWEState) -> str:
     """Route after human intervention: PR agent if approved, supervisor if feedback given, else abort."""
+    action = state.get("hitl_action")
+    status = state.get("status")
+
+    if action == "reject" or status == "rejected":
+        logger.warning("HITL run was explicitly rejected. Terminating graph.")
+        return END
+
     approved = state.get("hitl_approved")
     feedback = state.get("hitl_feedback")
 
-    if approved is True:
+    if approved is True or action == "approve":
         logger.info("HITL approval granted. Routing to pr_agent.")
         return "pr_agent"
 
-    if approved is False and feedback:
+    if (approved is False or action == "request_changes") and feedback and action != "reject":
         logger.info("HITL requested revisions with feedback: %s. Routing to supervisor.", feedback)
         return "supervisor"
 
