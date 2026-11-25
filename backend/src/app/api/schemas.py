@@ -1,6 +1,7 @@
 """Request and response schemas for API endpoints."""
 
 from typing import Any, Dict, List, Optional
+# pyrefly: ignore[missing-import]
 from pydantic import BaseModel, Field
 
 
@@ -32,6 +33,7 @@ class ResumeBody(BaseModel):
     approved: bool = Field(..., description="True if change is approved, False to reject or request changes")
     feedback: Optional[str] = Field(default=None, description="Optional revision instructions or comments for the agent")
     action: Optional[str] = Field(default=None, description="Explicit action: 'approve', 'request_changes', or 'reject'")
+    github_token: Optional[str] = Field(default=None, description="Optional user GitHub PAT for publishing the PR")
 
 
 class ResumeRunResponse(BaseModel):

@@ -61,14 +61,14 @@ class AgentService:
         )
         await save_run_metadata(metadata)
 
-        # 2. Build initial state
+        # 2. Build initial state (Keep sensitive GitHub token OUT of database state/checkpoints)
         initial_state: SWEState = {
             "thread_id": thread_id,
             "issue_url": issue_url,
             "repo": clean_repo,
             "issue_title": issue_title or "Resolve GitHub Issue",
             "issue_description": issue_description or "Autonomous bug resolution request",
-            "github_token": github_token,
+            "github_token": None,
             "test_attempts": 0,
             "max_test_attempts": 3,
             "risk_score": 0.0,
@@ -210,17 +210,25 @@ class AgentService:
             await queue.put({"event": "error", "data": {"error": str(exc), "thread_id": thread_id}})
 
     async def stream_events(self, thread_id: str) -> AsyncGenerator[str, None]:
-        """Yield Server-Sent Events (SSE) for the specified run."""
+        """Yield Server-Sent Events (SSE) for the specified run with Heroku-safe keep-alive."""
         queue = self._get_or_create_queue(thread_id)
 
-        while True:
-            item = await queue.get()
-            event_type = item.get("event", "message")
-            data_content = json.dumps(item.get("data", {}))
-            yield f"event: {event_type}\ndata: {data_content}\n\n"
+        # 1. Immediately yield initial connection frame to satisfy Heroku 30s initial response rule
+        yield ": initial-connect\n\n"
 
-            if event_type in ("done", "error"):
-                break
+        while True:
+            try:
+                # 2. Wait up to 15s for next event; send keep-alive comment to beat Heroku 55s router idle timeout
+                item = await asyncio.wait_for(queue.get(), timeout=15.0)
+                event_type = item.get("event", "message")
+                data_content = json.dumps(item.get("data", {}))
+                yield f"event: {event_type}\ndata: {data_content}\n\n"
+
+                if event_type in ("done", "error"):
+                    break
+            except asyncio.TimeoutError:
+                # Periodic keep-alive ping for Heroku router
+                yield ": keep-alive\n\n"
 
     async def resume_run(
         self,
@@ -228,6 +236,7 @@ class AgentService:
         approved: bool,
         feedback: Optional[str] = None,
         action: Optional[str] = None,
+        github_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Resume a paused HITL run with approval decision and feedback."""
         logger.info(
@@ -237,6 +246,13 @@ class AgentService:
             feedback,
             action,
         )
+        if github_token:
+            try:
+                from app.tools.mcp_client import get_mcp_client
+                get_mcp_client().set_active_token(github_token)
+            except Exception as e:
+                logger.warning("Could not set active user GitHub token on resume: %s", e)
+
         graph = get_graph()
         config = {"configurable": {"thread_id": thread_id}}
 

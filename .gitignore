@@ -3,14 +3,22 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Environment variables
+# Environment variables & secrets
 .env
+.env.*
+*.env
 *.env.local
 
 # Virtual environments
 .venv/
 venv/
 ENV/
+
+# Dependencies & build outputs
+node_modules/
+dist/
+dist-ssr/
+build/
 
 # Testing & linting caches
 .pytest_cache/

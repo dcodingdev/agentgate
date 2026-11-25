@@ -126,6 +126,7 @@ export interface ResumeBody {
   approved: boolean
   feedback?: string | null
   action?: 'approve' | 'request_changes' | 'reject'
+  github_token?: string | null
 }
 
 export interface ResumeRunResponse {

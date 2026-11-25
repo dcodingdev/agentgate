@@ -51,6 +51,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 # Initialize FastAPI app
+settings = get_settings()
+
 app = FastAPI(
     title="AgentGate API",
     description="Autonomous SWE Agent system with LangGraph, MCP, E2B Sandbox, and HITL guardrails.",
@@ -58,10 +60,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Middleware
+# CORS Middleware (Honors exact production origins from CORS_ORIGINS; tightens Vercel previews to project domain)
+vercel_preview_regex = (
+    r"^https://agentgate(-[a-z0-9-]+)?\.vercel\.app$"
+    if any("vercel.app" in o for o in settings.cors_origins)
+    else None
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=vercel_preview_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

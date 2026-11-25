@@ -384,7 +384,8 @@ async def pr_agent_node(state: SWEState) -> Dict[str, Any]:
         .strip("/")
     )
     branch = f"agentgate-fix-{state.get('thread_id', '1')}"
-    token = state.get("github_token") or ""
+    from app.tools.mcp_client import get_mcp_client
+    token = state.get("github_token") or get_mcp_client().active_user_token or ""
     sandbox_id = state.get("sandbox_id")
 
     # If active in sandbox with user token, push the actual committed fix branch to remote

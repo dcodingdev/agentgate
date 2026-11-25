@@ -79,6 +79,7 @@ async def resume_run(run_id: str, body: ResumeBody) -> ResumeRunResponse:
             approved=body.approved,
             feedback=body.feedback,
             action=body.action,
+            github_token=body.github_token,
         )
         return ResumeRunResponse(
             thread_id=run_id,

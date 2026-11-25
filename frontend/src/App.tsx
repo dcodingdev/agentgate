@@ -247,7 +247,11 @@ export default function App() {
     }
     try {
       setLoading(true)
-      const res = await resumeRun(threadId, { approved: true, action: 'approve' })
+      const res = await resumeRun(threadId, {
+        approved: true,
+        action: 'approve',
+        github_token: githubToken.trim(),
+      })
       const finalPrUrl =
         res.pr_url ||
         runState?.pr_url ||

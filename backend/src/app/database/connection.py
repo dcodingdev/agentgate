@@ -34,12 +34,19 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
     import os
     settings = get_settings()
 
+    db_url = settings.database_url
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
     if (
-        not settings.database_url
-        or "mock" in settings.database_url.lower()
-        or "sqlite" in settings.database_url.lower()
+        # pyrefly: ignore[parse-error]
+        not db_url
+        or "mock" in db_url.lower()
+        or "sqlite" in db_url.lower()
         or os.getenv("DATABASE_URL") == "mock"
+    # pyrefly: ignore[parse-error]
     ):
+        # pyrefly: ignore[parse-error]
         logger.info("Using in-memory store and MemorySaver (mock database configured).")
         _pool = None
         _checkpointer = MemorySaver()
@@ -50,19 +57,20 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
         # pyrefly: ignore[missing-import]
         import psycopg
 
-        logger.info("Probing PostgreSQL at %s", settings.database_url)
+        logger.info("Probing PostgreSQL at %s", db_url)
         # Fast probe with short timeout to prevent AsyncConnectionPool retry loops on auth failure
         async with await asyncio.wait_for(
-            psycopg.AsyncConnection.connect(settings.database_url, connect_timeout=2),
+            psycopg.AsyncConnection.connect(db_url, connect_timeout=2),
+            # pyrefly: ignore[bad-keyword-argument]
             timeout=2.0,
         ) as probe_conn:
             pass
 
         logger.info("PostgreSQL probe successful. Initializing pool...")
         _pool = AsyncConnectionPool(
-            conninfo=settings.database_url,
-            min_size=2,
-            max_size=20,
+            conninfo=db_url,
+            min_size=1,
+            max_size=5,
             open=False,
             timeout=2.0,
             kwargs={"autocommit": True, "prepare_threshold": 0},
@@ -89,10 +97,16 @@ async def init_db() -> tuple[Optional[AsyncConnectionPool], BaseCheckpointSaver]
             _checkpointer = saver
             logger.info("PostgreSQL checkpointer initialized successfully.")
         except Exception as exc:
+            if settings.env.lower() == "production":
+                logger.critical("AsyncPostgresSaver setup failed in production: %s", exc)
+                raise RuntimeError(f"AsyncPostgresSaver setup failed in production: {exc}")
             logger.warning("Could not setup AsyncPostgresSaver (%s). Falling back to MemorySaver.", exc)
             _checkpointer = MemorySaver()
 
     except Exception as exc:
+        if settings.env.lower() == "production":
+            logger.critical("PostgreSQL connection failed in production: %s", exc)
+            raise RuntimeError(f"PostgreSQL connection failed in production: {exc}")
         logger.warning(
             "PostgreSQL connection failed (%s). Running with MemorySaver and in-memory store for metadata.",
             exc,
